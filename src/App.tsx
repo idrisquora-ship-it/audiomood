@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
-import { UserProvider } from "@/contexts/UserContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import MainLayout from "@/components/layout/MainLayout";
 import HomePage from "@/pages/HomePage";
 import SearchPage from "@/pages/SearchPage";
@@ -14,6 +14,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import LoginPage from "@/pages/LoginPage";
 import ArtistDashboard from "@/pages/ArtistDashboard";
 import UploadMusicPage from "@/pages/UploadMusicPage";
+import PlaylistPage from "@/pages/PlaylistPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,7 +22,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <UserProvider>
+      <AuthProvider>
         <PlayerProvider>
           <Toaster />
           <Sonner />
@@ -37,12 +38,13 @@ const App = () => (
                 <Route path="dashboard" element={<ArtistDashboard />} />
                 <Route path="upload" element={<UploadMusicPage />} />
                 <Route path="playlists" element={<LibraryPage />} />
+                <Route path="playlists/:id" element={<PlaylistPage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </PlayerProvider>
-      </UserProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

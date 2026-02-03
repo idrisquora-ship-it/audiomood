@@ -1,212 +1,54 @@
 import React from 'react';
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Volume2,
-  VolumeX,
-  Maximize2,
-  Minimize2,
-  ListMusic,
-  Mic2,
-  Heart,
-} from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Mic2, ChevronUp, ChevronDown, Music } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { useUser } from '@/contexts/UserContext';
-import { formatDuration } from '@/data/mockData';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
 
 const GlobalPlayer: React.FC = () => {
-  const {
-    currentSong,
-    isPlaying,
-    currentTime,
-    volume,
-    isMinimized,
-    showLyrics,
-    togglePlay,
-    nextSong,
-    prevSong,
-    seek,
-    setVolume,
-    toggleMinimize,
-    toggleLyrics,
-  } = usePlayer();
+  const { currentSong, isPlaying, currentTime, duration, volume, isMinimized, togglePlay, seek, setVolume, toggleMinimize, toggleLyrics, nextSong, previousSong } = usePlayer();
+  if (!currentSong) return null;
+  const formatTime = (seconds: number) => { if (isNaN(seconds)) return '0:00'; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${mins}:${secs.toString().padStart(2, '0')}`; };
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  const { likedSongs, toggleLikeSong, addToRecentlyPlayed } = useUser();
-
-  // Track recently played
-  React.useEffect(() => {
-    if (currentSong && isPlaying) {
-      addToRecentlyPlayed(currentSong.id);
-    }
-  }, [currentSong?.id, isPlaying]);
-
-  if (!currentSong) {
-    return null;
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-0 left-64 right-0 z-50 h-16 border-t border-border bg-background/95 backdrop-blur-lg">
+        <div className="flex h-full items-center gap-4 px-4">
+          <div className="flex items-center gap-3">
+            {currentSong.cover_url ? <img src={currentSong.cover_url} alt={currentSong.title} className="h-10 w-10 rounded-md object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted"><Music className="h-5 w-5 text-muted-foreground" /></div>}
+            <div className="min-w-0"><p className="truncate text-sm font-medium">{currentSong.title}</p><p className="truncate text-xs text-muted-foreground">{currentSong.artist?.display_name}</p></div>
+          </div>
+          <div className="flex-1 mx-4"><Slider value={[currentTime]} max={duration || 100} step={1} onValueChange={([value]) => seek(value)} className="cursor-pointer" /></div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={togglePlay} className="h-8 w-8">{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" fill="currentColor" />}</Button>
+            <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-8 w-8"><ChevronUp className="h-4 w-4" /></Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const isLiked = likedSongs.includes(currentSong.id);
-  const progress = currentSong.duration > 0 ? (currentTime / currentSong.duration) * 100 : 0;
-
   return (
-    <div
-      className={cn(
-        'fixed bottom-0 left-64 right-0 z-50 border-t border-border bg-[hsl(var(--player-background))] transition-all duration-300',
-        isMinimized ? 'h-20' : 'h-28'
-      )}
-    >
-      {/* Progress bar (always at top) */}
-      <div className="absolute left-0 right-0 top-0 h-1 bg-muted cursor-pointer group"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const percent = (e.clientX - rect.left) / rect.width;
-          seek(percent * currentSong.duration);
-        }}
-      >
-        <div
-          className="h-full gradient-primary transition-all"
-          style={{ width: `${progress}%` }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
-        />
-      </div>
-
-      <div className="flex h-full items-center justify-between px-4 pt-1">
-        {/* Song Info */}
-        <div className="flex items-center gap-4 w-80">
-          <img
-            src={currentSong.coverUrl}
-            alt={currentSong.title}
-            className="h-14 w-14 rounded-lg object-cover shadow-lg"
-          />
-          <div className="min-w-0 flex-1">
-            <h4 className="font-medium truncate">{currentSong.title}</h4>
-            <p className="text-sm text-muted-foreground truncate">
-              {currentSong.artistName}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => toggleLikeSong(currentSong.id)}
-            className={cn(
-              'shrink-0',
-              isLiked && 'text-primary'
-            )}
-          >
-            <Heart className={cn('h-5 w-5', isLiked && 'fill-current')} />
-          </Button>
+    <div className="fixed bottom-0 left-64 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-lg">
+      <div className="h-1 w-full bg-muted"><div className="h-full bg-primary transition-all duration-100" style={{ width: `${progress}%` }} /></div>
+      <div className="flex h-24 items-center justify-between px-6">
+        <div className="flex w-1/4 items-center gap-4">
+          {currentSong.cover_url ? <img src={currentSong.cover_url} alt={currentSong.title} className="h-16 w-16 rounded-lg object-cover shadow-lg" /> : <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-muted shadow-lg"><Music className="h-8 w-8 text-muted-foreground" /></div>}
+          <div className="min-w-0"><p className="truncate font-medium">{currentSong.title}</p><p className="truncate text-sm text-muted-foreground">{currentSong.artist?.display_name}</p></div>
         </div>
-
-        {/* Controls */}
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={prevSong}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <SkipBack className="h-5 w-5" />
-            </Button>
-            <Button
-              onClick={togglePlay}
-              size="icon"
-              className="h-10 w-10 rounded-full gradient-primary glow-primary"
-            >
-              {isPlaying ? (
-                <Pause className="h-5 w-5" />
-              ) : (
-                <Play className="h-5 w-5 ml-0.5" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={nextSong}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <SkipForward className="h-5 w-5" />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={previousSong}><SkipBack className="h-5 w-5" /></Button>
+            <Button onClick={togglePlay} className="h-12 w-12 rounded-full gradient-primary glow-primary">{isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" fill="currentColor" />}</Button>
+            <Button variant="ghost" size="icon" onClick={nextSong}><SkipForward className="h-5 w-5" /></Button>
           </div>
-          
-          {!isMinimized && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{formatDuration(currentTime)}</span>
-              <Slider
-                value={[currentTime]}
-                max={currentSong.duration}
-                step={1}
-                onValueChange={([value]) => seek(value)}
-                className="w-96"
-              />
-              <span>{formatDuration(currentSong.duration)}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>{formatTime(currentTime)}</span><Slider value={[currentTime]} max={duration || 100} step={1} onValueChange={([value]) => seek(value)} className="w-64 cursor-pointer" /><span>{formatTime(duration)}</span></div>
         </div>
-
-        {/* Extra Controls */}
-        <div className="flex items-center gap-2 w-80 justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleLyrics}
-            className={cn(
-              'text-muted-foreground hover:text-foreground',
-              showLyrics && 'text-primary'
-            )}
-          >
-            <Mic2 className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ListMusic className="h-5 w-5" />
-          </Button>
-
-          {/* Volume */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setVolume(volume === 0 ? 0.7 : 0)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {volume === 0 ? (
-                <VolumeX className="h-5 w-5" />
-              ) : (
-                <Volume2 className="h-5 w-5" />
-              )}
-            </Button>
-            <Slider
-              value={[volume * 100]}
-              max={100}
-              step={1}
-              onValueChange={([value]) => setVolume(value / 100)}
-              className="w-24"
-            />
-          </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMinimize}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {isMinimized ? (
-              <Maximize2 className="h-5 w-5" />
-            ) : (
-              <Minimize2 className="h-5 w-5" />
-            )}
-          </Button>
+        <div className="flex w-1/4 items-center justify-end gap-4">
+          <Button variant="ghost" size="icon" onClick={toggleLyrics}><Mic2 className="h-5 w-5" /></Button>
+          <div className="flex items-center gap-2"><Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 0.7 : 0)}>{volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</Button><Slider value={[volume * 100]} max={100} step={1} onValueChange={([value]) => setVolume(value / 100)} className="w-24 cursor-pointer" /></div>
+          <Button variant="ghost" size="icon" onClick={toggleMinimize}><ChevronDown className="h-5 w-5" /></Button>
         </div>
       </div>
     </div>

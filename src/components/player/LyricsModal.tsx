@@ -1,21 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { mockLyrics } from '@/data/mockData';
+import { useLyrics } from '@/hooks/useLyrics';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const LyricsModal: React.FC = () => {
   const { currentSong, currentTime, showLyrics, toggleLyrics } = usePlayer();
+  const { lyrics, fetchLyrics, clearLyrics } = useLyrics();
   const [activeLineIndex, setActiveLineIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const lyrics = currentSong ? mockLyrics[currentSong.id] : null;
+  // Fetch lyrics when song changes
+  useEffect(() => {
+    if (currentSong && showLyrics) {
+      fetchLyrics(currentSong.id);
+    } else {
+      clearLyrics();
+    }
+  }, [currentSong?.id, showLyrics, fetchLyrics, clearLyrics]);
 
   // Find active lyric line
   useEffect(() => {
-    if (!lyrics) return;
+    if (!lyrics?.lines) return;
 
     const currentLineIndex = lyrics.lines.findIndex((line, index) => {
       const nextLine = lyrics.lines[index + 1];
@@ -49,13 +57,13 @@ const LyricsModal: React.FC = () => {
       {/* Song info */}
       <div className="absolute left-6 top-6 flex items-center gap-4">
         <img
-          src={currentSong.coverUrl}
+          src={currentSong.cover_url || '/placeholder.svg'}
           alt={currentSong.title}
           className="h-16 w-16 rounded-lg object-cover shadow-lg"
         />
         <div>
           <h2 className="text-xl font-bold">{currentSong.title}</h2>
-          <p className="text-muted-foreground">{currentSong.artistName}</p>
+          <p className="text-muted-foreground">{currentSong.artist?.display_name}</p>
         </div>
       </div>
 
@@ -63,7 +71,7 @@ const LyricsModal: React.FC = () => {
       <div className="flex h-full items-center justify-center pt-24 pb-32">
         <ScrollArea className="h-full w-full max-w-2xl" ref={containerRef}>
           <div className="px-6 py-12 space-y-6 text-center">
-            {lyrics ? (
+            {lyrics?.lines && lyrics.lines.length > 0 ? (
               lyrics.lines.map((line, index) => (
                 <p
                   key={index}
@@ -83,7 +91,7 @@ const LyricsModal: React.FC = () => {
               <div className="text-center text-muted-foreground">
                 <p className="text-xl">No lyrics available for this song</p>
                 <p className="mt-2 text-sm">
-                  Lyrics will appear here when available
+                  Lyrics will be auto-generated when songs are uploaded
                 </p>
               </div>
             )}

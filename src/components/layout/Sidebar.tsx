@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search, Library, Heart, Music, BarChart3, Upload, LogIn, Loader2 } from 'lucide-react';
+import { Home, Search, Library, Heart, Music, BarChart3, Upload, LogIn, Loader2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ const Sidebar: React.FC = () => {
         <nav className="space-y-1 py-4">{navItems.map(item => (<Link key={item.path} to={item.path} className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors', isActive(item.path) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}><item.icon className="h-5 w-5" />{item.label}</Link>))}</nav>
         {isAuthenticated && isArtist && (<><Separator className="my-2" /><div className="py-4"><h3 className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">Artist</h3><nav className="space-y-1">{artistItems.map(item => (<Link key={item.path} to={item.path} className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors', isActive(item.path) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}><item.icon className="h-5 w-5" />{item.label}</Link>))}</nav></div></>)}
         {isAuthenticated && (<><Separator className="my-2" /><div className="py-4"><h3 className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">Playlists</h3><nav className="space-y-1"><Link to="/liked" className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors', isActive('/liked') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}><Heart className="h-5 w-5" />Liked Songs</Link></nav></div></>)}
+        {isAuthenticated && (<><Separator className="my-2" /><nav className="py-2"><Link to="/settings" className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors', isActive('/settings') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}><Settings className="h-5 w-5" />Settings</Link></nav></>)}
       </ScrollArea>
       <div className="border-t border-border p-4">
         {loading ? <div className="flex items-center justify-center py-2"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> : isAuthenticated && profile ? (

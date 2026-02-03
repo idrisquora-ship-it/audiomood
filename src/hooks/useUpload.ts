@@ -20,7 +20,8 @@ export function useUpload() {
     coverFile: File | null,
     title: string,
     genre: string,
-    isPublic: boolean = true
+    isPublic: boolean = true,
+    artistNotes: string | null = null
   ) => {
     if (!profile || !isArtist) {
       toast({
@@ -85,6 +86,7 @@ export function useUpload() {
           duration,
           genre,
           is_public: isPublic,
+          artist_notes: artistNotes,
         })
         .select()
         .single();
@@ -134,6 +136,31 @@ export function useUpload() {
         // Don't fail the upload if lyrics generation fails
       }
       setGeneratingLyrics(false);
+
+      // Trigger notification for followers (fire and forget)
+      try {
+        await fetch(
+          `https://icqjadkcarpgayjtercn.supabase.co/functions/v1/create-notification`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+            body: JSON.stringify({
+              type: 'new_song',
+              data: {
+                artist_id: profile.id,
+                song_id: song.id,
+                song_title: title,
+                artist_name: profile.display_name,
+              },
+            }),
+          }
+        );
+      } catch (notifError) {
+        console.error('Error sending notifications:', notifError);
+      }
 
       toast({
         title: 'Upload successful!',

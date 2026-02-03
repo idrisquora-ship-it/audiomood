@@ -4,6 +4,7 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
+import SongInfoDrawer from './SongInfoDrawer';
 
 const GlobalPlayer: React.FC = () => {
   const { currentSong, isPlaying, currentTime, duration, volume, isMinimized, togglePlay, seek, setVolume, toggleMinimize, toggleLyrics, nextSong, previousSong } = usePlayer();
@@ -46,6 +47,7 @@ const GlobalPlayer: React.FC = () => {
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>{formatTime(currentTime)}</span><Slider value={[currentTime]} max={duration || 100} step={1} onValueChange={([value]) => seek(value)} className="w-64 cursor-pointer" /><span>{formatTime(duration)}</span></div>
         </div>
         <div className="flex w-1/4 items-center justify-end gap-4">
+          <SongInfoDrawer />
           <Button variant="ghost" size="icon" onClick={toggleLyrics}><Mic2 className="h-5 w-5" /></Button>
           <div className="flex items-center gap-2"><Button variant="ghost" size="icon" onClick={() => setVolume(volume === 0 ? 0.7 : 0)}>{volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</Button><Slider value={[volume * 100]} max={100} step={1} onValueChange={([value]) => setVolume(value / 100)} className="w-24 cursor-pointer" /></div>
           <Button variant="ghost" size="icon" onClick={toggleMinimize}><ChevronDown className="h-5 w-5" /></Button>

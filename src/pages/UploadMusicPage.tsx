@@ -1,242 +1,41 @@
-import React, { useState } from 'react';
-import { Upload, Music, Image, X, Check } from 'lucide-react';
-import { useUser } from '@/contexts/UserContext';
+import React, { useState, useRef } from 'react';
+import { Upload, Music, Image, Loader2 } from 'lucide-react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { useUpload } from '@/hooks/useUpload';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 
-const genres = [
-  'Electronic',
-  'Ambient',
-  'Synthwave',
-  'Chillwave',
-  'Lo-Fi',
-  'Pop',
-  'Rock',
-  'Hip Hop',
-  'R&B',
-  'Jazz',
-];
+const genres = ['Pop', 'Rock', 'Hip Hop', 'R&B', 'Electronic', 'Jazz', 'Classical', 'Country', 'Folk', 'Metal', 'Indie', 'Alternative', 'Other'];
 
 const UploadMusicPage: React.FC = () => {
-  const { user } = useUser();
-  const [title, setTitle] = useState('');
-  const [genre, setGenre] = useState('');
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setCoverFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCoverPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!title || !genre || !audioFile) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    setIsUploading(true);
-
-    // Simulate upload
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    toast.success('Track uploaded successfully!', {
-      description: `"${title}" is now live on Senoxa`,
-    });
-
-    // Reset form
-    setTitle('');
-    setGenre('');
-    setAudioFile(null);
-    setCoverFile(null);
-    setCoverPreview(null);
-    setIsUploading(false);
-  };
+  const { isArtist, isAuthenticated, loading: authLoading } = useAuthContext();
+  const { uploadSong, uploading, progress, generatingLyrics } = useUpload();
+  const navigate = useNavigate();
+  const [title, setTitle] = useState(''); const [genre, setGenre] = useState(''); const [isPublic, setIsPublic] = useState(true); const [audioFile, setAudioFile] = useState<File | null>(null); const [coverFile, setCoverFile] = useState<File | null>(null); const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null); const coverInputRef = useRef<HTMLInputElement>(null);
+  if (authLoading) { return <div className="flex items-center justify-center p-8 py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>; }
+  if (!isAuthenticated) { return <Navigate to="/login" replace />; }
+  if (!isArtist) { return <div className="flex flex-col items-center justify-center p-8 py-20"><Upload className="h-16 w-16 text-muted-foreground/50" /><h2 className="mt-4 text-2xl font-bold">Upload Music</h2><p className="mt-2 text-muted-foreground">Upgrade to artist to upload</p><Button onClick={() => navigate('/profile')} className="mt-6 gradient-primary">Become an Artist</Button></div>; }
+  const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { setAudioFile(file); if (!title) { setTitle(file.name.replace(/\.[^/.]+$/, '')); } } };
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { setCoverFile(file); const reader = new FileReader(); reader.onloadend = () => { setCoverPreview(reader.result as string); }; reader.readAsDataURL(file); } };
+  const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (!audioFile || !title || !genre) return; const song = await uploadSong(audioFile, coverFile, title, genre, isPublic); if (song) { navigate('/dashboard'); } };
+  const isValid = audioFile && title && genre;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Upload Music</h1>
-        <p className="text-muted-foreground">
-          Share your music with the world
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-6">
-          {/* Audio Upload */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Music className="h-5 w-5 text-primary" />
-                Audio File
-              </CardTitle>
-              <CardDescription>
-                Upload your track (MP3, WAV, FLAC)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {audioFile ? (
-                <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-                  <Music className="h-10 w-10 text-primary" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{audioFile.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(audioFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setAudioFile(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center gap-4 p-8 border-2 border-dashed border-muted rounded-lg cursor-pointer hover:border-primary/50 transition-colors">
-                  <Upload className="h-10 w-10 text-muted-foreground" />
-                  <div className="text-center">
-                    <p className="font-medium">Drop your audio file here</p>
-                    <p className="text-sm text-muted-foreground">
-                      or click to browse
-                    </p>
-                  </div>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={e => setAudioFile(e.target.files?.[0] || null)}
-                  />
-                </label>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Cover Image */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Image className="h-5 w-5 text-primary" />
-                Cover Image
-              </CardTitle>
-              <CardDescription>
-                Add album artwork (optional)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-6">
-                {coverPreview ? (
-                  <div className="relative">
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      className="h-32 w-32 rounded-lg object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -right-2 -top-2 h-6 w-6"
-                      onClick={() => {
-                        setCoverFile(null);
-                        setCoverPreview(null);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <label className="flex h-32 w-32 flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted cursor-pointer hover:border-primary/50 transition-colors">
-                    <Image className="h-8 w-8 text-muted-foreground" />
-                    <span className="mt-2 text-xs text-muted-foreground">
-                      Add cover
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleCoverChange}
-                    />
-                  </label>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Track Details */}
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle>Track Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="Enter track title"
-                  className="bg-muted/50"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="genre">Genre *</Label>
-                <Select value={genre} onValueChange={setGenre}>
-                  <SelectTrigger className="bg-muted/50">
-                    <SelectValue placeholder="Select a genre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {genres.map(g => (
-                      <SelectItem key={g} value={g}>
-                        {g}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            disabled={isUploading || !audioFile || !title || !genre}
-            className="w-full gradient-primary glow-primary h-12 text-lg"
-          >
-            {isUploading ? (
-              <>Uploading...</>
-            ) : (
-              <>
-                <Check className="mr-2 h-5 w-5" />
-                Upload Track
-              </>
-            )}
-          </Button>
-        </div>
+    <div className="p-8 max-w-2xl mx-auto">
+      <div className="mb-8"><h1 className="text-3xl font-bold">Upload Music</h1><p className="text-muted-foreground">Share your music with the world</p></div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <Card className="bg-muted/30"><CardHeader><CardTitle className="flex items-center gap-2"><Music className="h-5 w-5 text-primary" />Audio File</CardTitle></CardHeader><CardContent><input type="file" ref={audioInputRef} onChange={handleAudioChange} accept="audio/*" className="hidden" /><div onClick={() => audioInputRef.current?.click()} className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 cursor-pointer hover:border-primary/50 transition-colors">{audioFile ? <><Music className="h-12 w-12 text-primary mb-4" /><p className="font-medium">{audioFile.name}</p></> : <><Upload className="h-12 w-12 text-muted-foreground mb-4" /><p className="font-medium">Click to upload audio</p></>}</div></CardContent></Card>
+        <Card className="bg-muted/30"><CardHeader><CardTitle className="flex items-center gap-2"><Image className="h-5 w-5 text-primary" />Cover Image (Optional)</CardTitle></CardHeader><CardContent><input type="file" ref={coverInputRef} onChange={handleCoverChange} accept="image/*" className="hidden" /><div onClick={() => coverInputRef.current?.click()} className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 cursor-pointer hover:border-primary/50 transition-colors">{coverPreview ? <img src={coverPreview} alt="Cover preview" className="w-32 h-32 object-cover rounded-lg" /> : <><Image className="h-12 w-12 text-muted-foreground mb-4" /><p className="font-medium">Click to upload cover</p></>}</div></CardContent></Card>
+        <Card className="bg-muted/30"><CardHeader><CardTitle>Song Details</CardTitle></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label htmlFor="title">Title</Label><Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter song title" /></div><div className="space-y-2"><Label>Genre</Label><Select value={genre} onValueChange={setGenre}><SelectTrigger><SelectValue placeholder="Select a genre" /></SelectTrigger><SelectContent>{genres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div><div className="flex items-center justify-between"><div><Label>Make Public</Label><p className="text-sm text-muted-foreground">Public songs will be visible to everyone</p></div><Switch checked={isPublic} onCheckedChange={setIsPublic} /></div></CardContent></Card>
+        {uploading && <Card className="bg-muted/30"><CardContent className="pt-6"><div className="space-y-4"><div className="space-y-2"><div className="flex justify-between text-sm"><span>Uploading audio...</span><span>{progress.audio}%</span></div><Progress value={progress.audio} /></div>{generatingLyrics && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /><span>Generating lyrics with AI...</span></div>}</div></CardContent></Card>}
+        <Button type="submit" disabled={!isValid || uploading} className="w-full gradient-primary glow-primary">{uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading...</> : <><Upload className="mr-2 h-4 w-4" />Upload Song</>}</Button>
       </form>
     </div>
   );

@@ -1,17 +1,24 @@
-import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
-import { Song, PlayerState } from '@/types/music';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, ReactNode } from 'react';
+import { Song } from '@/hooks/useSongs';
 
-interface PlayerContextType extends PlayerState {
+interface PlayerContextType {
+  currentSong: Song | null;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  isMinimized: boolean;
+  showLyrics: boolean;
+  queue: Song[];
+  queueIndex: number;
   playSong: (song: Song, queue?: Song[]) => void;
   togglePlay: () => void;
-  pause: () => void;
-  resume: () => void;
-  nextSong: () => void;
-  prevSong: () => void;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
   toggleMinimize: () => void;
   toggleLyrics: () => void;
+  nextSong: () => void;
+  previousSong: () => void;
   addToQueue: (song: Song) => void;
 }
 
@@ -25,169 +32,48 @@ export const usePlayer = () => {
   return context;
 };
 
-export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.7);
   const [isMinimized, setIsMinimized] = useState(true);
   const [showLyrics, setShowLyrics] = useState(false);
   const [queue, setQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
 
-  // Initialize audio element
   useEffect(() => {
     audioRef.current = new Audio();
     audioRef.current.volume = volume;
-
     const audio = audioRef.current;
-
-    const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    const handleEnded = () => {
-      if (queueIndex < queue.length - 1) {
-        setQueueIndex(prev => prev + 1);
-      } else {
-        setIsPlaying(false);
-      }
-    };
-
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleDurationChange = () => setDuration(audio.duration || 0);
+    const handleEnded = () => { if (queueIndex < queue.length - 1) { setQueueIndex(prev => prev + 1); } else { setIsPlaying(false); } };
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('ended', handleEnded);
-
-    return () => {
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.pause();
-    };
+    return () => { audio.removeEventListener('timeupdate', handleTimeUpdate); audio.removeEventListener('durationchange', handleDurationChange); audio.removeEventListener('ended', handleEnded); audio.pause(); };
   }, []);
 
-  // Handle queue changes
-  useEffect(() => {
-    if (queue.length > 0 && queueIndex < queue.length) {
-      const song = queue[queueIndex];
-      setCurrentSong(song);
-      if (audioRef.current) {
-        audioRef.current.src = song.audioUrl;
-        if (isPlaying) {
-          audioRef.current.play().catch(console.error);
-        }
-      }
-    }
-  }, [queueIndex, queue]);
-
-  const playSong = useCallback((song: Song, newQueue?: Song[]) => {
-    if (newQueue) {
-      const index = newQueue.findIndex(s => s.id === song.id);
-      setQueue(newQueue);
-      setQueueIndex(index >= 0 ? index : 0);
-    } else {
-      setQueue([song]);
-      setQueueIndex(0);
-    }
+  const playSong = useCallback((song: Song, songQueue?: Song[]) => {
+    if (songQueue) { setQueue(songQueue); const index = songQueue.findIndex(s => s.id === song.id); setQueueIndex(index >= 0 ? index : 0); } else if (queue.length === 0) { setQueue([song]); setQueueIndex(0); }
     setCurrentSong(song);
-    if (audioRef.current) {
-      audioRef.current.src = song.audioUrl;
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
-    }
-  }, []);
+    if (audioRef.current) { audioRef.current.src = song.audio_url; audioRef.current.play().catch(console.error); setIsPlaying(true); }
+  }, [queue]);
 
-  const togglePlay = useCallback(() => {
-    if (!audioRef.current || !currentSong) return;
-    
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
-    }
-  }, [isPlaying, currentSong]);
-
-  const pause = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-  }, []);
-
-  const resume = useCallback(() => {
-    if (audioRef.current && currentSong) {
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
-    }
-  }, [currentSong]);
-
-  const nextSong = useCallback(() => {
-    if (queueIndex < queue.length - 1) {
-      setQueueIndex(prev => prev + 1);
-      setIsPlaying(true);
-    }
-  }, [queueIndex, queue.length]);
-
-  const prevSong = useCallback(() => {
-    if (audioRef.current && audioRef.current.currentTime > 3) {
-      audioRef.current.currentTime = 0;
-    } else if (queueIndex > 0) {
-      setQueueIndex(prev => prev - 1);
-      setIsPlaying(true);
-    }
-  }, [queueIndex]);
-
-  const seek = useCallback((time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  }, []);
-
-  const setVolume = useCallback((newVolume: number) => {
-    setVolumeState(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
-  }, []);
-
-  const toggleMinimize = useCallback(() => {
-    setIsMinimized(prev => !prev);
-  }, []);
-
-  const toggleLyrics = useCallback(() => {
-    setShowLyrics(prev => !prev);
-  }, []);
-
-  const addToQueue = useCallback((song: Song) => {
-    setQueue(prev => [...prev, song]);
-  }, []);
+  const togglePlay = useCallback(() => { if (!audioRef.current || !currentSong) return; if (isPlaying) { audioRef.current.pause(); } else { audioRef.current.play().catch(console.error); } setIsPlaying(!isPlaying); }, [isPlaying, currentSong]);
+  const seek = useCallback((time: number) => { if (audioRef.current) { audioRef.current.currentTime = time; setCurrentTime(time); } }, []);
+  const setVolume = useCallback((newVolume: number) => { if (audioRef.current) { audioRef.current.volume = newVolume; } setVolumeState(newVolume); }, []);
+  const toggleMinimize = useCallback(() => { setIsMinimized(!isMinimized); }, [isMinimized]);
+  const toggleLyrics = useCallback(() => { setShowLyrics(!showLyrics); }, [showLyrics]);
+  const nextSong = useCallback(() => { if (queue.length === 0) return; const nextIndex = (queueIndex + 1) % queue.length; setQueueIndex(nextIndex); const song = queue[nextIndex]; setCurrentSong(song); if (audioRef.current) { audioRef.current.src = song.audio_url; audioRef.current.play().catch(console.error); setIsPlaying(true); } }, [queue, queueIndex]);
+  const previousSong = useCallback(() => { if (queue.length === 0) return; if (currentTime > 3) { seek(0); return; } const prevIndex = queueIndex === 0 ? queue.length - 1 : queueIndex - 1; setQueueIndex(prevIndex); const song = queue[prevIndex]; setCurrentSong(song); if (audioRef.current) { audioRef.current.src = song.audio_url; audioRef.current.play().catch(console.error); setIsPlaying(true); } }, [queue, queueIndex, currentTime, seek]);
+  const addToQueue = useCallback((song: Song) => { setQueue(prev => [...prev, song]); }, []);
 
   return (
-    <PlayerContext.Provider
-      value={{
-        currentSong,
-        isPlaying,
-        currentTime,
-        volume,
-        isMinimized,
-        showLyrics,
-        queue,
-        queueIndex,
-        playSong,
-        togglePlay,
-        pause,
-        resume,
-        nextSong,
-        prevSong,
-        seek,
-        setVolume,
-        toggleMinimize,
-        toggleLyrics,
-        addToQueue,
-      }}
-    >
+    <PlayerContext.Provider value={{ currentSong, isPlaying, currentTime, duration, volume, isMinimized, showLyrics, queue, queueIndex, playSong, togglePlay, seek, setVolume, toggleMinimize, toggleLyrics, nextSong, previousSong, addToQueue }}>
       {children}
     </PlayerContext.Provider>
   );

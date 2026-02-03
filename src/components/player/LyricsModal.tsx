@@ -4,13 +4,13 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { useLyrics } from '@/hooks/useLyrics';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const LyricsModal: React.FC = () => {
   const { currentSong, currentTime, showLyrics, toggleLyrics } = usePlayer();
   const { lyrics, fetchLyrics, clearLyrics } = useLyrics();
   const [activeLineIndex, setActiveLineIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
 
   // Fetch lyrics when song changes
   useEffect(() => {
@@ -34,6 +34,34 @@ const LyricsModal: React.FC = () => {
       setActiveLineIndex(currentLineIndex);
     }
   }, [currentTime, lyrics, activeLineIndex]);
+
+  // Auto-scroll to active lyric line
+  useEffect(() => {
+    if (!lyrics?.lines || activeLineIndex < 0) return;
+
+    const activeElement = lineRefs.current[activeLineIndex];
+    if (activeElement && containerRef.current) {
+      const container = containerRef.current;
+      const containerHeight = container.clientHeight;
+      const elementTop = activeElement.offsetTop;
+      const elementHeight = activeElement.clientHeight;
+      
+      // Center the active line in the viewport
+      const scrollTo = elementTop - (containerHeight / 2) + (elementHeight / 2);
+      
+      container.scrollTo({
+        top: Math.max(0, scrollTo),
+        behavior: 'smooth',
+      });
+    }
+  }, [activeLineIndex, lyrics]);
+
+  // Reset line refs when lyrics change
+  useEffect(() => {
+    if (lyrics?.lines) {
+      lineRefs.current = new Array(lyrics.lines.length).fill(null);
+    }
+  }, [lyrics]);
 
   if (!showLyrics || !currentSong) {
     return null;
@@ -67,21 +95,26 @@ const LyricsModal: React.FC = () => {
         </div>
       </div>
 
-      {/* Lyrics */}
+      {/* Lyrics Container */}
       <div className="flex h-full items-center justify-center pt-24 pb-32">
-        <ScrollArea className="h-full w-full max-w-2xl" ref={containerRef}>
+        <div 
+          ref={containerRef}
+          className="h-full w-full max-w-2xl overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent"
+          style={{ scrollBehavior: 'smooth' }}
+        >
           <div className="px-6 py-12 space-y-6 text-center">
             {lyrics?.lines && lyrics.lines.length > 0 ? (
               lyrics.lines.map((line, index) => (
                 <p
                   key={index}
+                  ref={(el) => { lineRefs.current[index] = el; }}
                   className={cn(
-                    'text-2xl font-medium transition-all duration-300',
+                    'text-2xl font-medium transition-all duration-500',
                     index === activeLineIndex
                       ? 'text-foreground scale-110 text-gradient-primary'
                       : index < activeLineIndex
-                      ? 'text-muted-foreground/50'
-                      : 'text-muted-foreground/70'
+                      ? 'text-muted-foreground/50 scale-100'
+                      : 'text-muted-foreground/70 scale-100'
                   )}
                 >
                   {line.text}
@@ -96,7 +129,7 @@ const LyricsModal: React.FC = () => {
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );

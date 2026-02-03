@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import ScrollToTop from "@/components/ScrollToTop";
 import MainLayout from "@/components/layout/MainLayout";
 import HomePage from "@/pages/HomePage";
 import SearchPage from "@/pages/SearchPage";
@@ -15,6 +16,7 @@ import LoginPage from "@/pages/LoginPage";
 import ArtistDashboard from "@/pages/ArtistDashboard";
 import UploadMusicPage from "@/pages/UploadMusicPage";
 import PlaylistPage from "@/pages/PlaylistPage";
+import ArtistProfilePage from "@/pages/ArtistProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/" element={<MainLayout />}>
@@ -35,6 +38,7 @@ const App = () => (
                 <Route path="library" element={<LibraryPage />} />
                 <Route path="liked" element={<LikedSongsPage />} />
                 <Route path="profile" element={<ProfilePage />} />
+                <Route path="artist/:id" element={<ArtistProfilePage />} />
                 <Route path="dashboard" element={<ArtistDashboard />} />
                 <Route path="upload" element={<UploadMusicPage />} />
                 <Route path="playlists" element={<LibraryPage />} />

@@ -103,13 +103,13 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-8">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto">
+      <div className="mb-6 md:mb-8">
         <div className="flex items-center gap-3">
-          <Settings className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Settings</h1>
+          <Settings className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
         </div>
-        <p className="mt-2 text-muted-foreground">Manage your account and preferences</p>
+        <p className="mt-2 text-sm md:text-base text-muted-foreground">Manage your account and preferences</p>
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">

@@ -29,21 +29,21 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       {/* Profile Header */}
-      <div className="mb-8 flex flex-col items-center gap-6 sm:flex-row">
+      <div className="mb-6 md:mb-8 flex flex-col items-center gap-4 md:gap-6 sm:flex-row">
         <div className="relative">
-          <Avatar className="h-32 w-32">
+          <Avatar className="h-24 w-24 md:h-32 md:w-32">
             <AvatarImage src={profile.avatar || undefined} />
-            <AvatarFallback className="text-4xl bg-gradient-to-br from-primary to-accent text-white">
+            <AvatarFallback className="text-2xl md:text-4xl bg-gradient-to-br from-primary to-accent text-white">
               {profile.display_name.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </div>
 
         <div className="text-center sm:text-left">
-          <p className="text-sm font-medium text-muted-foreground capitalize">{profile.role}</p>
-          <h1 className="text-4xl font-bold">{profile.display_name}</h1>
+          <p className="text-xs md:text-sm font-medium text-muted-foreground capitalize">{profile.role}</p>
+          <h1 className="text-2xl md:text-4xl font-bold">{profile.display_name}</h1>
           <p className="mt-2 text-muted-foreground">
             Member since {new Date(profile.created_at).toLocaleDateString()}
           </p>

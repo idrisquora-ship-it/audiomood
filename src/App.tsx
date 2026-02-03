@@ -3,7 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { PlayerProvider } from "@/contexts/PlayerContext";
+import { UserProvider } from "@/contexts/UserContext";
+import MainLayout from "@/components/layout/MainLayout";
+import HomePage from "@/pages/HomePage";
+import SearchPage from "@/pages/SearchPage";
+import LibraryPage from "@/pages/LibraryPage";
+import LikedSongsPage from "@/pages/LikedSongsPage";
+import ProfilePage from "@/pages/ProfilePage";
+import LoginPage from "@/pages/LoginPage";
+import ArtistDashboard from "@/pages/ArtistDashboard";
+import UploadMusicPage from "@/pages/UploadMusicPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -11,15 +21,28 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <UserProvider>
+        <PlayerProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<HomePage />} />
+                <Route path="search" element={<SearchPage />} />
+                <Route path="library" element={<LibraryPage />} />
+                <Route path="liked" element={<LikedSongsPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="dashboard" element={<ArtistDashboard />} />
+                <Route path="upload" element={<UploadMusicPage />} />
+                <Route path="playlists" element={<LibraryPage />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </PlayerProvider>
+      </UserProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

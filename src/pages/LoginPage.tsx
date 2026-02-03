@@ -19,9 +19,9 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none"><div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-primary/10 blur-3xl" /><div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-accent/10 blur-3xl" /></div>
+      <div className="fixed inset-0 overflow-hidden pointer-events-none"><div className="absolute -top-40 -right-40 h-60 md:h-80 w-60 md:w-80 rounded-full bg-primary/10 blur-3xl" /><div className="absolute -bottom-40 -left-40 h-60 md:h-80 w-60 md:w-80 rounded-full bg-accent/10 blur-3xl" /></div>
       <Card className="relative w-full max-w-md bg-background/80 backdrop-blur-lg border-border/50">
-        <CardHeader className="text-center"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent"><Music className="h-8 w-8 text-white" /></div><CardTitle className="text-2xl font-bold">Senoxa</CardTitle><CardDescription>Stream, create, and discover music</CardDescription></CardHeader>
+        <CardHeader className="text-center"><div className="mx-auto mb-3 md:mb-4 flex h-12 w-12 md:h-16 md:w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent"><Music className="h-6 w-6 md:h-8 md:w-8 text-white" /></div><CardTitle className="text-xl md:text-2xl font-bold">Senoxa</CardTitle><CardDescription className="text-sm">Stream, create, and discover music</CardDescription></CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6"><TabsTrigger value="signin">Sign In</TabsTrigger><TabsTrigger value="signup">Sign Up</TabsTrigger></TabsList>

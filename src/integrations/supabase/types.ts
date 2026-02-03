@@ -118,6 +118,72 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          milestones: boolean
+          new_follower: boolean
+          new_release: boolean
+          playlist_updates: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          milestones?: boolean
+          new_follower?: boolean
+          new_release?: boolean
+          playlist_updates?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          milestones?: boolean
+          new_follower?: boolean
+          new_release?: boolean
+          playlist_updates?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       playlist_songs: {
         Row: {
           created_at: string
@@ -228,6 +294,7 @@ export type Database = {
       songs: {
         Row: {
           artist_id: string
+          artist_notes: string | null
           audio_url: string
           cover_url: string | null
           created_at: string
@@ -241,6 +308,7 @@ export type Database = {
         }
         Insert: {
           artist_id: string
+          artist_notes?: string | null
           audio_url: string
           cover_url?: string | null
           created_at?: string
@@ -254,6 +322,7 @@ export type Database = {
         }
         Update: {
           artist_id?: string
+          artist_notes?: string | null
           audio_url?: string
           cover_url?: string | null
           created_at?: string
@@ -313,6 +382,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_settings: {
+        Row: {
+          appearance_settings: Json
+          bio: string | null
+          country: string | null
+          created_at: string
+          id: string
+          lyrics_settings: Json
+          playback_settings: Json
+          privacy_settings: Json
+          social_links: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appearance_settings?: Json
+          bio?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          lyrics_settings?: Json
+          playback_settings?: Json
+          privacy_settings?: Json
+          social_links?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appearance_settings?: Json
+          bio?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          lyrics_settings?: Json
+          playback_settings?: Json
+          privacy_settings?: Json
+          social_links?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

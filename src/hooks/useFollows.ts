@@ -117,6 +117,30 @@ export function useFollows() {
           setFollowedArtists(prev => [...prev, data as FollowedArtist]);
         }
         
+        // Send notification to artist (fire and forget)
+        try {
+          const session = await supabase.auth.getSession();
+          fetch(
+            `https://icqjadkcarpgayjtercn.supabase.co/functions/v1/create-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.data.session?.access_token}`,
+              },
+              body: JSON.stringify({
+                type: 'new_follower',
+                data: {
+                  artist_id: artistId,
+                  follower_name: profile.display_name,
+                },
+              }),
+            }
+          );
+        } catch (notifError) {
+          console.error('Error sending follow notification:', notifError);
+        }
+        
         toast({
           title: 'Following',
         });

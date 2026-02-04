@@ -4,7 +4,7 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import { useOfflineDownload } from '@/hooks/useOfflineDownload';
 import { Song } from '@/hooks/useSongs';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import SongActions from './SongActions';
 
 interface SongCardProps { 
   song: Song; 
@@ -97,6 +97,7 @@ const SongCard: React.FC<SongCardProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <SongActions song={song} variant="icon" />
           {showDownload && (
             <button 
               onClick={handleDownload}
@@ -150,25 +151,28 @@ const SongCard: React.FC<SongCardProps> = ({
           )}
         </button>
 
-        {/* Download button */}
-        {showDownload && (
-          <button 
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className={cn(
-              'absolute top-2 right-2 flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm opacity-0 transition-all group-hover:opacity-100',
-              downloaded ? 'text-primary' : 'text-foreground hover:bg-background'
-            )}
-          >
-            {isDownloading ? (
-              <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-            ) : downloaded ? (
-              <Check className="h-3 w-3 md:h-4 md:w-4" />
-            ) : (
-              <Download className="h-3 w-3 md:h-4 md:w-4" />
-            )}
-          </button>
-        )}
+        {/* Actions button */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 transition-all group-hover:opacity-100">
+          <SongActions song={song} />
+          {showDownload && (
+            <button 
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className={cn(
+                'flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-all',
+                downloaded ? 'text-primary' : 'text-foreground hover:bg-background'
+              )}
+            >
+              {isDownloading ? (
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+              ) : downloaded ? (
+                <Check className="h-3 w-3 md:h-4 md:w-4" />
+              ) : (
+                <Download className="h-3 w-3 md:h-4 md:w-4" />
+              )}
+            </button>
+          )}
+        </div>
 
         {/* Downloaded indicator */}
         {downloaded && (

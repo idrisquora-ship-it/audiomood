@@ -1,7 +1,8 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Mic2, ChevronUp, ChevronDown, Music, Download, Check, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Mic2, ChevronUp, ChevronDown, Music, Download, Check, Loader2, Heart } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useOfflineDownload } from '@/hooks/useOfflineDownload';
+import { useLikes } from '@/hooks/useLikes';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
@@ -23,8 +24,8 @@ const GlobalPlayer: React.FC = () => {
     nextSong, 
     previousSong 
   } = usePlayer();
-
   const { downloadSong, isDownloaded, downloading } = useOfflineDownload();
+  const { isLiked, toggleLike } = useLikes();
 
   if (!currentSong) return null;
 
@@ -38,6 +39,7 @@ const GlobalPlayer: React.FC = () => {
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const downloaded = isDownloaded(currentSong.id);
   const isDownloading = downloading === currentSong.id;
+  const liked = isLiked(currentSong.id);
 
   const handleDownload = () => {
     if (!downloaded && !isDownloading) {
@@ -116,6 +118,15 @@ const GlobalPlayer: React.FC = () => {
           </div>
         </div>
         <div className="flex w-1/4 items-center justify-end gap-4">
+          {/* Like Button */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => toggleLike(currentSong.id)}
+            className={cn(liked && 'text-destructive')}
+          >
+            <Heart className={cn('h-5 w-5', liked && 'fill-current')} />
+          </Button>
           {/* Download Button */}
           <Button 
             variant="ghost" 

@@ -7,6 +7,7 @@ import MobilePlayer from './MobilePlayer';
 import GlobalPlayer from '@/components/player/GlobalPlayer';
 import LyricsModal from '@/components/player/LyricsModal';
 import NotificationBell from '@/components/notifications/NotificationBell';
+import InstallPrompt from '@/components/pwa/InstallPrompt';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -70,6 +71,9 @@ const MainLayout: React.FC = () => {
 
       {/* Mobile Bottom Navigation */}
       <MobileNav />
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
 
       {/* Lyrics Modal */}
       <LyricsModal />

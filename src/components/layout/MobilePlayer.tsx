@@ -1,6 +1,8 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, ChevronUp, Music, X } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, ChevronUp, Music, Heart, Download, Check, Loader2 } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useLikes } from '@/hooks/useLikes';
+import { useOfflineDownload } from '@/hooks/useOfflineDownload';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -12,14 +14,15 @@ const MobilePlayer: React.FC = () => {
     isPlaying,
     currentTime,
     duration,
-    volume,
     togglePlay,
     seek,
-    setVolume,
     nextSong,
     previousSong,
     toggleLyrics,
   } = usePlayer();
+  
+  const { isLiked, toggleLike } = useLikes();
+  const { downloadSong, isDownloaded, downloading } = useOfflineDownload();
 
   const [expanded, setExpanded] = React.useState(false);
 
@@ -33,6 +36,16 @@ const MobilePlayer: React.FC = () => {
   };
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const liked = isLiked(currentSong.id);
+  const downloaded = isDownloaded(currentSong.id);
+  const isDownloading = downloading === currentSong.id;
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!downloaded && !isDownloading) {
+      downloadSong(currentSong);
+    }
+  };
 
   return (
     <div className="fixed bottom-14 left-0 right-0 z-40 md:hidden">
@@ -126,12 +139,39 @@ const MobilePlayer: React.FC = () => {
                 )}
               </div>
 
-              {/* Song Info */}
+              {/* Song Info & Actions */}
               <div className="mt-6 w-full text-center">
                 <h2 className="truncate text-xl font-bold">{currentSong.title}</h2>
                 <p className="truncate text-muted-foreground">
                   {currentSong.artist?.display_name}
                 </p>
+                
+                {/* Like & Download buttons */}
+                <div className="mt-4 flex items-center justify-center gap-6">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleLike(currentSong.id)}
+                    className={cn('h-10 w-10', liked && 'text-destructive')}
+                  >
+                    <Heart className={cn('h-6 w-6', liked && 'fill-current')} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className={cn('h-10 w-10', downloaded && 'text-primary')}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : downloaded ? (
+                      <Check className="h-6 w-6" />
+                    ) : (
+                      <Download className="h-6 w-6" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
 

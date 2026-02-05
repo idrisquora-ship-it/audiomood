@@ -1,12 +1,15 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, ChevronUp, Music, Heart, Download, Check, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, ChevronUp, Music, Heart, Download, Check, Loader2, ListPlus } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useLikes } from '@/hooks/useLikes';
 import { useOfflineDownload } from '@/hooks/useOfflineDownload';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { AddToPlaylistDialog } from '@/components/music/SongActions';
+import { useToast } from '@/hooks/use-toast';
 
 const MobilePlayer: React.FC = () => {
   const {
@@ -23,8 +26,11 @@ const MobilePlayer: React.FC = () => {
   
   const { isLiked, toggleLike } = useLikes();
   const { downloadSong, isDownloaded, downloading } = useOfflineDownload();
+  const { isAuthenticated } = useAuthContext();
+  const { toast } = useToast();
 
   const [expanded, setExpanded] = React.useState(false);
+  const [showPlaylistDialog, setShowPlaylistDialog] = React.useState(false);
 
   if (!currentSong) return null;
 
@@ -39,6 +45,18 @@ const MobilePlayer: React.FC = () => {
   const liked = isLiked(currentSong.id);
   const downloaded = isDownloaded(currentSong.id);
   const isDownloading = downloading === currentSong.id;
+
+  const handleOpenPlaylistDialog = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to add songs to playlists',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setShowPlaylistDialog(true);
+  };
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -146,8 +164,8 @@ const MobilePlayer: React.FC = () => {
                   {currentSong.artist?.display_name}
                 </p>
                 
-                {/* Like & Download buttons */}
-                <div className="mt-4 flex items-center justify-center gap-6">
+                {/* Like, Playlist & Download buttons */}
+                <div className="mt-4 flex items-center justify-center gap-4">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -155,6 +173,14 @@ const MobilePlayer: React.FC = () => {
                     className={cn('h-10 w-10', liked && 'text-destructive')}
                   >
                     <Heart className={cn('h-6 w-6', liked && 'fill-current')} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleOpenPlaylistDialog}
+                    className="h-10 w-10"
+                  >
+                    <ListPlus className="h-6 w-6" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -215,6 +241,12 @@ const MobilePlayer: React.FC = () => {
           </div>
         </SheetContent>
       </Sheet>
+      
+      <AddToPlaylistDialog
+        open={showPlaylistDialog}
+        onOpenChange={setShowPlaylistDialog}
+        song={currentSong}
+      />
     </div>
   );
 };

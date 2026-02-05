@@ -61,11 +61,11 @@ const LikedSongsPage: React.FC = () => {
           <div className="space-y-1">
             {likedSongs.map((song, index) => (
               <div key={song.id} className="flex items-center gap-2 md:gap-4">
-                <span className="w-6 md:w-8 text-center text-xs md:text-sm text-muted-foreground">
+                <span className="w-6 md:w-8 text-center text-xs md:text-sm text-muted-foreground shrink-0">
                   {index + 1}
                 </span>
                 <div className="flex-1">
-                  <SongCard song={song} variant="row" queue={likedSongs} />
+                  <SongCard song={song} variant="row" queue={likedSongs} showDownload={false} />
                 </div>
               </div>
             ))}

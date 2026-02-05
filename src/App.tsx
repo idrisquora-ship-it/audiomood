@@ -17,6 +17,7 @@ import LoginPage from "@/pages/LoginPage";
 import ArtistDashboard from "@/pages/ArtistDashboard";
 import UploadMusicPage from "@/pages/UploadMusicPage";
 import PlaylistPage from "@/pages/PlaylistPage";
+import AddMusicToPlaylistPage from "@/pages/AddMusicToPlaylistPage";
 import ArtistProfilePage from "@/pages/ArtistProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "./pages/NotFound";
@@ -46,6 +47,8 @@ const App = () => (
                   <Route path="upload" element={<UploadMusicPage />} />
                   <Route path="playlists" element={<LibraryPage />} />
                   <Route path="playlists/:id" element={<PlaylistPage />} />
+                  <Route path="playlist/:id" element={<PlaylistPage />} />
+                  <Route path="playlist/:id/add-music" element={<AddMusicToPlaylistPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

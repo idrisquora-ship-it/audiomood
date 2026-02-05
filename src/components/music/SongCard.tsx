@@ -97,7 +97,7 @@ const SongCard: React.FC<SongCardProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <SongActions song={song} variant="icon" />
+          <SongActions song={song} variant="icon" className="opacity-100 md:opacity-0 md:group-hover:opacity-100" />
           {showDownload && (
             <button 
               onClick={handleDownload}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Mic2, ChevronUp, ChevronDown, Music, Download, Check, Loader2, Heart } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Mic2, ChevronUp, ChevronDown, Music, Download, Check, Loader2, Heart, Shuffle, Repeat, Repeat1 } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useOfflineDownload } from '@/hooks/useOfflineDownload';
 import { useLikes } from '@/hooks/useLikes';
@@ -10,19 +10,10 @@ import SongInfoDrawer from './SongInfoDrawer';
 
 const GlobalPlayer: React.FC = () => {
   const { 
-    currentSong, 
-    isPlaying, 
-    currentTime, 
-    duration, 
-    volume, 
-    isMinimized, 
-    togglePlay, 
-    seek, 
-    setVolume, 
-    toggleMinimize, 
-    toggleLyrics, 
-    nextSong, 
-    previousSong 
+    currentSong, isPlaying, currentTime, duration, volume, 
+    isMinimized, togglePlay, seek, setVolume, toggleMinimize, 
+    toggleLyrics, nextSong, previousSong, shuffle, repeatMode,
+    toggleShuffle, cycleRepeat,
   } = usePlayer();
   const { downloadSong, isDownloaded, downloading } = useOfflineDownload();
   const { isLiked, toggleLike } = useLikes();
@@ -46,6 +37,8 @@ const GlobalPlayer: React.FC = () => {
       downloadSong(currentSong);
     }
   };
+
+  const RepeatIcon = repeatMode === 'one' ? Repeat1 : Repeat;
 
   if (isMinimized) {
     return (
@@ -101,6 +94,9 @@ const GlobalPlayer: React.FC = () => {
         </div>
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={toggleShuffle} className={cn(shuffle && 'text-primary')}>
+              <Shuffle className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={previousSong}>
               <SkipBack className="h-5 w-5" />
             </Button>
@@ -110,6 +106,9 @@ const GlobalPlayer: React.FC = () => {
             <Button variant="ghost" size="icon" onClick={nextSong}>
               <SkipForward className="h-5 w-5" />
             </Button>
+            <Button variant="ghost" size="icon" onClick={cycleRepeat} className={cn(repeatMode !== 'off' && 'text-primary')}>
+              <RepeatIcon className="h-4 w-4" />
+            </Button>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{formatTime(currentTime)}</span>
@@ -118,30 +117,11 @@ const GlobalPlayer: React.FC = () => {
           </div>
         </div>
         <div className="flex w-1/4 items-center justify-end gap-4">
-          {/* Like Button */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => toggleLike(currentSong.id)}
-            className={cn(liked && 'text-destructive')}
-          >
+          <Button variant="ghost" size="icon" onClick={() => toggleLike(currentSong.id)} className={cn(liked && 'text-destructive')}>
             <Heart className={cn('h-5 w-5', liked && 'fill-current')} />
           </Button>
-          {/* Download Button */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleDownload}
-            disabled={isDownloading}
-            className={cn(downloaded && 'text-primary')}
-          >
-            {isDownloading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : downloaded ? (
-              <Check className="h-5 w-5" />
-            ) : (
-              <Download className="h-5 w-5" />
-            )}
+          <Button variant="ghost" size="icon" onClick={handleDownload} disabled={isDownloading} className={cn(downloaded && 'text-primary')}>
+            {isDownloading ? <Loader2 className="h-5 w-5 animate-spin" /> : downloaded ? <Check className="h-5 w-5" /> : <Download className="h-5 w-5" />}
           </Button>
           <SongInfoDrawer />
           <Button variant="ghost" size="icon" onClick={toggleLyrics}>

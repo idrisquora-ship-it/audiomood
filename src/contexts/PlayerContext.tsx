@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useRef, useEffect, useCallb
 import { Song } from '@/hooks/useSongs';
 import { supabase } from '@/integrations/supabase/client';
 
+export type RepeatMode = 'off' | 'one' | 'all';
+
 interface PlayerContextType {
   currentSong: Song | null;
   isPlaying: boolean;
@@ -12,6 +14,8 @@ interface PlayerContextType {
   showLyrics: boolean;
   queue: Song[];
   queueIndex: number;
+  shuffle: boolean;
+  repeatMode: RepeatMode;
   playSong: (song: Song, queue?: Song[]) => void;
   togglePlay: () => void;
   seek: (time: number) => void;
@@ -21,6 +25,8 @@ interface PlayerContextType {
   nextSong: () => void;
   previousSong: () => void;
   addToQueue: (song: Song) => void;
+  toggleShuffle: () => void;
+  cycleRepeat: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -34,7 +40,7 @@ export const usePlayer = () => {
 };
 
 export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(new Audio());
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,105 +50,116 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [showLyrics, setShowLyrics] = useState(false);
   const [queue, setQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [streamRecorded, setStreamRecorded] = useState<string | null>(null);
-  const playStartTimeRef = useRef<number>(0);
+  const streamRecordedRef = useRef<string | null>(null);
+  const currentSongRef = useRef<Song | null>(null);
+  const queueRef = useRef<Song[]>([]);
+  const queueIndexRef = useRef(0);
+  const repeatModeRef = useRef<RepeatMode>('off');
+  const shuffleRef = useRef(false);
 
-  // Record stream to database
+  // Keep refs in sync
+  useEffect(() => { currentSongRef.current = currentSong; }, [currentSong]);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
+  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
+  useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
+  useEffect(() => { streamRecordedRef.current = streamRecorded; }, [streamRecorded]);
+
   const recordStream = useCallback(async (songId: string, durationPlayed: number) => {
     try {
-      // Get current user's profile
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
-
       if (!profile) return;
-
-      // Insert stream record
-      const { error } = await supabase
-        .from('streams')
-        .insert({
-          song_id: songId,
-          user_id: profile.id,
-          duration_played: Math.floor(durationPlayed),
-        });
-
-      if (error) {
-        console.error('Error recording stream:', error);
-        return;
-      }
-
-      // Increment plays count using RPC
+      await supabase.from('streams').insert({
+        song_id: songId,
+        user_id: profile.id,
+        duration_played: Math.floor(durationPlayed),
+      });
       await supabase.rpc('increment_song_plays', { song_uuid: songId });
-      
-      console.log('Stream recorded successfully');
     } catch (err) {
       console.error('Error recording stream:', err);
     }
   }, []);
 
+  // Setup audio event listeners ONCE
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.volume = volume;
     const audio = audioRef.current;
-    
+    audio.volume = 0.7;
+
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-      
-      // Record stream after 30 seconds of playback
-      if (audio.currentTime >= 30 && streamRecorded !== currentSong?.id && currentSong) {
-        setStreamRecorded(currentSong.id);
-        const durationPlayed = audio.currentTime - playStartTimeRef.current;
-        recordStream(currentSong.id, durationPlayed);
+      const song = currentSongRef.current;
+      if (audio.currentTime >= 30 && song && streamRecordedRef.current !== song.id) {
+        streamRecordedRef.current = song.id;
+        setStreamRecorded(song.id);
+        recordStream(song.id, audio.currentTime);
       }
     };
-    
+
     const handleDurationChange = () => setDuration(audio.duration || 0);
-    
+
     const handleEnded = () => {
-      // Record final duration if not already recorded
-      if (currentSong && streamRecorded !== currentSong.id) {
-        const durationPlayed = audio.duration || audio.currentTime;
-        recordStream(currentSong.id, durationPlayed);
-        setStreamRecorded(currentSong.id);
+      const song = currentSongRef.current;
+      if (song && streamRecordedRef.current !== song.id) {
+        recordStream(song.id, audio.duration || audio.currentTime);
+        streamRecordedRef.current = song.id;
+        setStreamRecorded(song.id);
       }
-      
-      if (queueIndex < queue.length - 1) {
-        setQueueIndex(prev => prev + 1);
+
+      const rm = repeatModeRef.current;
+      const q = queueRef.current;
+      const idx = queueIndexRef.current;
+
+      if (rm === 'one') {
+        audio.currentTime = 0;
+        audio.play().catch(console.error);
+        return;
+      }
+
+      if (idx < q.length - 1) {
+        const nextIdx = shuffleRef.current
+          ? Math.floor(Math.random() * q.length)
+          : idx + 1;
+        setQueueIndex(nextIdx);
+      } else if (rm === 'all' && q.length > 0) {
+        setQueueIndex(shuffleRef.current ? Math.floor(Math.random() * q.length) : 0);
       } else {
         setIsPlaying(false);
       }
     };
-    
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('ended', handleEnded);
-    
+
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
       audio.pause();
     };
-  }, [currentSong, streamRecorded, recordStream, queueIndex, queue.length]);
+  }, [recordStream]);
 
-  // Play next song in queue when index changes
+  // Play song when queueIndex changes
   useEffect(() => {
     if (queue.length > 0 && queue[queueIndex]) {
       const song = queue[queueIndex];
       if (currentSong?.id !== song.id) {
         setCurrentSong(song);
         setStreamRecorded(null);
-        playStartTimeRef.current = 0;
-        if (audioRef.current) {
-          audioRef.current.src = song.audio_url;
-          audioRef.current.play().catch(console.error);
-          setIsPlaying(true);
-        }
+        streamRecordedRef.current = null;
+        const audio = audioRef.current;
+        audio.src = song.audio_url;
+        audio.play().catch(console.error);
+        setIsPlaying(true);
       }
     }
   }, [queueIndex, queue]);
@@ -152,59 +169,53 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setQueue(songQueue);
       const index = songQueue.findIndex(s => s.id === song.id);
       setQueueIndex(index >= 0 ? index : 0);
-    } else if (queue.length === 0) {
+    } else {
       setQueue([song]);
       setQueueIndex(0);
     }
-    
+
     setCurrentSong(song);
     setStreamRecorded(null);
-    playStartTimeRef.current = 0;
-    
-    if (audioRef.current) {
-      audioRef.current.src = song.audio_url;
-      audioRef.current.play().catch(console.error);
-      setIsPlaying(true);
-    }
-  }, [queue]);
+    streamRecordedRef.current = null;
+
+    const audio = audioRef.current;
+    audio.src = song.audio_url;
+    audio.play().catch(console.error);
+    setIsPlaying(true);
+  }, []);
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current || !currentSong) return;
+    if (!currentSong) return;
+    const audio = audioRef.current;
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
     } else {
-      audioRef.current.play().catch(console.error);
+      audio.play().catch(console.error);
     }
     setIsPlaying(!isPlaying);
   }, [isPlaying, currentSong]);
 
   const seek = useCallback((time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
+    audioRef.current.currentTime = time;
+    setCurrentTime(time);
   }, []);
 
   const setVolume = useCallback((newVolume: number) => {
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
+    audioRef.current.volume = newVolume;
     setVolumeState(newVolume);
   }, []);
 
-  const toggleMinimize = useCallback(() => {
-    setIsMinimized(!isMinimized);
-  }, [isMinimized]);
-
-  const toggleLyrics = useCallback(() => {
-    setShowLyrics(!showLyrics);
-  }, [showLyrics]);
+  const toggleMinimize = useCallback(() => setIsMinimized(prev => !prev), []);
+  const toggleLyrics = useCallback(() => setShowLyrics(prev => !prev), []);
 
   const nextSong = useCallback(() => {
     if (queue.length === 0) return;
-    const nextIndex = (queueIndex + 1) % queue.length;
-    setQueueIndex(nextIndex);
-  }, [queue, queueIndex]);
+    if (shuffle) {
+      setQueueIndex(Math.floor(Math.random() * queue.length));
+    } else {
+      setQueueIndex((queueIndex + 1) % queue.length);
+    }
+  }, [queue, queueIndex, shuffle]);
 
   const previousSong = useCallback(() => {
     if (queue.length === 0) return;
@@ -212,35 +223,29 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       seek(0);
       return;
     }
-    const prevIndex = queueIndex === 0 ? queue.length - 1 : queueIndex - 1;
-    setQueueIndex(prevIndex);
-  }, [queue, queueIndex, currentTime, seek]);
+    if (shuffle) {
+      setQueueIndex(Math.floor(Math.random() * queue.length));
+    } else {
+      setQueueIndex(queueIndex === 0 ? queue.length - 1 : queueIndex - 1);
+    }
+  }, [queue, queueIndex, currentTime, seek, shuffle]);
 
   const addToQueue = useCallback((song: Song) => {
     setQueue(prev => [...prev, song]);
   }, []);
 
+  const toggleShuffle = useCallback(() => setShuffle(prev => !prev), []);
+  const cycleRepeat = useCallback(() => {
+    setRepeatMode(prev => prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off');
+  }, []);
+
   return (
     <PlayerContext.Provider
       value={{
-        currentSong,
-        isPlaying,
-        currentTime,
-        duration,
-        volume,
-        isMinimized,
-        showLyrics,
-        queue,
-        queueIndex,
-        playSong,
-        togglePlay,
-        seek,
-        setVolume,
-        toggleMinimize,
-        toggleLyrics,
-        nextSong,
-        previousSong,
-        addToQueue,
+        currentSong, isPlaying, currentTime, duration, volume,
+        isMinimized, showLyrics, queue, queueIndex, shuffle, repeatMode,
+        playSong, togglePlay, seek, setVolume, toggleMinimize, toggleLyrics,
+        nextSong, previousSong, addToQueue, toggleShuffle, cycleRepeat,
       }}
     >
       {children}

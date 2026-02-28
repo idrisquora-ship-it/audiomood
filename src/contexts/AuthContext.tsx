@@ -11,6 +11,7 @@ interface AuthContextType {
   isArtist: boolean;
   signUp: (email: string, password: string, displayName: string, role: 'listener' | 'artist') => Promise<any>;
   signIn: (email: string, password: string) => Promise<any>;
+  signInWithSpotify: () => Promise<void>;
   signOut: () => Promise<void>;
   upgradeToArtist: () => Promise<void>;
   refreshProfile: () => Promise<void>;

@@ -121,6 +121,23 @@ export function useAuth() {
     return { data };
   };
 
+  const signInWithSpotify = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'spotify',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      toast({
+        title: 'Spotify sign in failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -172,6 +189,7 @@ export function useAuth() {
     isArtist: profile?.role === 'artist',
     signUp,
     signIn,
+    signInWithSpotify,
     signOut,
     upgradeToArtist,
     refreshProfile,

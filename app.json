@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Audiomood",
+    "slug": "audiomood",
+    "scheme": "audiomood",
+    "icon": "./assets/images/newicon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/images/newicon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/newicon.png",
+          "color": "#FF6A00"
+        }
+      ],
+      ["expo-image-picker", { "photosPermission": "Allow Audiomood to choose cover artwork for your uploads." }],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.audiomood.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/newicon.png",
+        "backgroundColor": "#121212"
+      },
+      "statusBar": {
+        "backgroundColor": "#050505",
+        "barStyle": "light-content",
+        "translucent": false
+      },
+      "navigationBar": {
+        "backgroundColor": "#050505",
+        "barStyle": "light-content"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.audiomood.app",
+      "userInterfaceStyle": "dark"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "549e296c-a018-4bb2-97f4-8d073eefe9f0"
+      }
+    },
+    "owner": "epicbda"
+  }
+}

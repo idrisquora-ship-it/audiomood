@@ -1,0 +1,15 @@
+# dependencies
+node_modules/
+
+# expo
+.expo/
+
+# env (use EAS env / app.config extra for CI)
+.env
+.env.local
+
+# tooling / IDE
+.cursor/
+
+# firebase admin SDK must never ship in-repo
+**/audiomood-*-firebase-adminsdk*.json

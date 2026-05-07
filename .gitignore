@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# Prefer npm + package-lock.json on CI/EAS so postinstall patches apply reliably
+bun.lock
+
 # expo
 .expo/
 

@@ -4,6 +4,10 @@ node_modules/
 # expo
 .expo/
 
+# Generated native dirs (managed workflow + EAS prebuild — do not commit)
+android/
+ios/
+
 # env (use EAS env / app.config extra for CI)
 .env
 .env.local

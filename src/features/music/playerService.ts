@@ -6,8 +6,14 @@ export async function setupPlayer() {
   if (initialized) return;
   await TrackPlayer.setupPlayer();
   await TrackPlayer.updateOptions({
-    capabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious],
-    compactCapabilities: [Capability.Play, Capability.Pause]
+    capabilities: [
+      Capability.Play,
+      Capability.Pause,
+      Capability.SkipToNext,
+      Capability.SkipToPrevious,
+      Capability.SeekTo
+    ],
+    compactCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious]
   });
   initialized = true;
 }

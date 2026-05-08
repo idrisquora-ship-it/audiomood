@@ -69,8 +69,9 @@ export default function MoodRadioPlayerScreen() {
           <Pressable
             style={styles.btn}
             onPress={() => {
+              if (!profileId) return;
               void markQueueItemPlayed(current.id);
-              void playRadioSong(current.song_id);
+              void playRadioSong(profileId, current.song_id);
               pushToast("Playing mood radio song", "success");
             }}
           >

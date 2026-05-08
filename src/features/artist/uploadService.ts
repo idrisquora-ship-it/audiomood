@@ -36,7 +36,7 @@ export async function createSongDraft(input: UploadSongLegacyInput) {
       language: input.language ?? null,
       explicit: input.explicit ?? false,
       release_date: input.releaseDate ?? null,
-      status: "pending_review"
+      status: "approved"
     })
     .select("id")
     .single();
@@ -91,7 +91,7 @@ export async function submitSongForReview(input: SubmitSongInput): Promise<strin
     coverPath = cp;
   }
 
-  const status = input.autoGenerateLyrics ? "processing_lyrics" : "pending_review";
+  const status = input.autoGenerateLyrics ? "processing_lyrics" : "approved";
 
   const { data, error } = await supabase
     .from("songs")

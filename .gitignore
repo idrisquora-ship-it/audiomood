@@ -6,6 +6,7 @@ bun.lock
 
 # expo
 .expo/
+dist/
 
 # Generated native dirs (managed workflow + EAS prebuild — do not commit)
 android/

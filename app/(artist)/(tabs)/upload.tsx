@@ -146,7 +146,7 @@ export default function ArtistUploadScreen() {
       await createAlbum(artist.data.id, title.trim(), description, coverPath, releaseDate.trim() || undefined);
       Alert.alert(
         "Album saved",
-        "Open Music to organize tracks, attach singles, and send everything for review when you’re ready."
+        "Open Music to add tracks to this album and manage your catalogue."
       );
       setTitle("");
       setDescription("");
@@ -163,11 +163,11 @@ export default function ArtistUploadScreen() {
       <ArtistScreen edges={["top", "left", "right"]}>
         <EmptyStateCard
           icon="checkmark-done-outline"
-          title="Your song has been submitted"
+          title="Your song is live"
           description={
             autoLyrics
-              ? "We’ll generate lyrics behind the scenes, then send your upload through moderator review."
-              : "We’ll notify you after the review team publishes or requests changes."
+              ? "Lyrics are generating in the background — listeners can stream the track already."
+              : "Your track is on the catalogue — share it from your Music tab anytime."
           }
           ctaLabel="Upload another"
           onCtaPress={() => {
@@ -304,7 +304,7 @@ export default function ArtistUploadScreen() {
             </Pressable>
 
             <PrimaryButton
-              title={loading ? "Submitting…" : "Submit for review"}
+              title={loading ? "Publishing…" : "Publish song"}
               onPress={() => void submitSingle()}
               disabled={loading}
               style={{ marginTop: spacing.sectionGap }}

@@ -4,14 +4,23 @@ type SignupInput = {
   email: string;
   password: string;
   username: string;
+  displayName: string;
   accountType: "listener" | "artist";
 };
 
 export async function signUp(input: SignupInput) {
+  const username = input.username.trim();
+  const displayName = input.displayName.trim() || username;
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
-    options: { data: { username: input.username.trim(), requested_account_type: input.accountType } }
+    options: {
+      data: {
+        username,
+        display_name: displayName,
+        requested_account_type: input.accountType
+      }
+    }
   });
   if (error) throw error;
   return data;
@@ -33,7 +42,15 @@ export async function signIn(identifier: string, password: string) {
   return data;
 }
 
-export async function getMyProfile() {
+export type MyProfileRow = {
+  id: string;
+  account_type: string;
+  role: string;
+  display_name: string | null;
+  username: string | null;
+};
+
+export async function getMyProfile(): Promise<MyProfileRow | null> {
   const userRes = await supabase.auth.getUser();
   const user = userRes.data.user;
   if (!user) return null;
@@ -42,36 +59,129 @@ export async function getMyProfile() {
     .from("profiles")
     .select("id, account_type, role, display_name, username")
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
   if (error) return null;
-  return data;
+  return data as MyProfileRow | null;
+}
+
+/** Call after sign-in routes; creates profile/settings if JWT exists but DB row missing (email-confirm gaps). */
+export async function ensureProfileForSession(): Promise<MyProfileRow | null> {
+  const userRes = await supabase.auth.getUser();
+  const user = userRes.data.user;
+  if (!user) return null;
+
+  const existing = await getMyProfile();
+  if (existing?.id) return existing;
+
+  const meta = (user.user_metadata ?? {}) as {
+    username?: string;
+    display_name?: string;
+    requested_account_type?: string;
+  };
+  const cleanUser = meta.username?.trim();
+  const username = cleanUser && cleanUser.length > 0 ? cleanUser : `user_${user.id.slice(0, 8)}`;
+  const displayName = meta.display_name?.trim() || username;
+  const accountType: "listener" | "artist" =
+    meta.requested_account_type === "artist" ? "artist" : "listener";
+
+  const { data: profile, error: insErr } = await supabase
+    .from("profiles")
+    .insert({
+      user_id: user.id,
+      username,
+      display_name: displayName,
+      account_type: accountType
+    })
+    .select("id, account_type, role, display_name, username")
+    .maybeSingle();
+
+  if (insErr?.code === "23505") {
+    return getMyProfile();
+  }
+  if (insErr || !profile) {
+    return getMyProfile();
+  }
+
+  await supabase.from("user_settings").upsert({ user_id: profile.id, autoplay_recommendations: true }, { onConflict: "user_id" });
+  const { error: plErr } = await supabase.from("playlists").insert({
+    owner_id: profile.id,
+    title: "Liked Songs",
+    visibility: "private",
+    is_liked_songs: true
+  });
+  if (plErr && plErr.code !== "23505") {
+    /* unique liked playlist per owner */
+  }
+
+  return profile as MyProfileRow;
 }
 
 export async function bootstrapNewUser(
   userId: string,
   accountType: "listener" | "artist",
-  preferredUsername?: string
+  preferredUsername?: string,
+  displayName?: string
 ) {
   const clean = preferredUsername?.trim();
   const username = clean && clean.length > 0 ? clean : `user_${userId.slice(0, 8)}`;
-  const { data: profile } = await supabase
+  const dn = displayName?.trim() || username;
+  const { data: profile, error } = await supabase
     .from("profiles")
     .insert({
       user_id: userId,
       username,
+      display_name: dn,
       account_type: accountType
     })
     .select("id")
     .single();
 
-  if (!profile) return;
+  if (error || !profile) return;
 
-  await supabase.from("user_settings").insert({ user_id: profile.id, autoplay_recommendations: true });
-  await supabase.from("playlists").insert({
+  await supabase.from("user_settings").upsert({ user_id: profile.id, autoplay_recommendations: true }, { onConflict: "user_id" });
+  const { error: lpErr } = await supabase.from("playlists").insert({
     owner_id: profile.id,
     title: "Liked Songs",
     visibility: "private",
     is_liked_songs: true
+  });
+  if (lpErr && lpErr.code !== "23505") {
+    /* ignore dup liked playlist */
+  }
+}
+
+export async function updateMyProfile(updates: { display_name?: string; username?: string }) {
+  const userRes = await supabase.auth.getUser();
+  const user = userRes.data.user;
+  if (!user) throw new Error("Not signed in");
+
+  const patch: Record<string, string> = {};
+  if (updates.display_name !== undefined) {
+    const v = updates.display_name.trim();
+    if (v.length === 0) throw new Error("Display name cannot be empty.");
+    patch.display_name = v;
+  }
+  if (updates.username !== undefined) {
+    const v = updates.username.trim().replace(/^@/, "");
+    if (v.length < 2) throw new Error("Username must be at least 2 characters.");
+    patch.username = v;
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  const { error } = await supabase.from("profiles").update(patch).eq("user_id", user.id);
+  if (error) {
+    const msg =
+      error.code === "23505"
+        ? "That username is already taken."
+        : error.message ?? "Could not update profile.";
+    throw new Error(msg);
+  }
+
+  await supabase.auth.updateUser({
+    data: {
+      ...(patch.display_name !== undefined ? { display_name: patch.display_name } : {}),
+      ...(patch.username !== undefined ? { username: patch.username } : {})
+    }
   });
 }
 

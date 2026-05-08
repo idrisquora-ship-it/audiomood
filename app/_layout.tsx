@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, StatusBar as RNStatusBar, View } from "react-native";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import type { User } from "@supabase/supabase-js";
+import { PlaybackBootstrap } from "@/components/player/PlaybackBootstrap";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { registerPushTokenForCurrentUser } from "@/features/notifications/pushService";
 import { queryClient } from "@/lib/queryClient";
@@ -101,6 +102,7 @@ export default function RootLayout() {
         </View>
       ) : (
         <QueryClientProvider client={queryClient}>
+          <PlaybackBootstrap />
           <StatusBar style="light" backgroundColor={colors.background} />
           <Stack
             screenOptions={{

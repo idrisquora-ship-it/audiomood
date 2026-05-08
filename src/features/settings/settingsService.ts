@@ -305,3 +305,18 @@ export async function createSupportTicket(profileId: string, subject: string, me
     .insert({ user_id: profileId, subject, message, status: "open" });
   if (error) throw error;
 }
+
+export async function clearListeningHistory(profileId: string) {
+  const { error } = await supabase.from("listening_history").delete().eq("user_id", profileId);
+  if (error) throw error;
+}
+
+export async function clearSearchHistory(profileId: string) {
+  const { error } = await supabase.from("search_history").delete().eq("user_id", profileId);
+  if (error) throw error;
+}
+
+export async function getSubscriptionSummary(profileId: string) {
+  const { data } = await supabase.from("subscriptions").select("plan,status").eq("user_id", profileId).maybeSingle();
+  return data as { plan: string; status: string } | null;
+}

@@ -79,7 +79,13 @@ export default function PlaylistDetailScreen() {
         </Pressable>
         {rows.map((row) => (
           <View key={row.id} style={styles.row}>
-            <Pressable style={styles.songCard} onPress={() => playPlaylistFromSong(songIds, row.song_id)}>
+            <Pressable
+              style={styles.songCard}
+              onPress={() => {
+                if (!profileId) return;
+                void playPlaylistFromSong(profileId, songIds, row.song_id);
+              }}
+            >
               <AppText>{row.songs?.title ?? "Unknown song"}</AppText>
               <AppText muted>Position: {row.position}</AppText>
             </Pressable>

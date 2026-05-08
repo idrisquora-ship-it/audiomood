@@ -54,7 +54,10 @@
     },
     "ios": {
       "bundleIdentifier": "com.audiomood.app",
-      "userInterfaceStyle": "dark"
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "extra": {
       "router": {},

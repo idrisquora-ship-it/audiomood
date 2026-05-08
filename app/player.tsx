@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Screen } from "@/components/ui/Screen";
+import { getMyProfile } from "@/features/auth/authService";
 import { getSongLyrics, type SyncedLyricLine } from "@/features/music/lyricsService";
+import { playNextTrackFromQueue, playPrevTrackFromQueue } from "@/features/music/songService";
 import { usePlayerStore } from "@/store/playerStore";
 import { colors } from "@/theme/colors";
 
@@ -13,12 +16,8 @@ export default function FullPlayerScreen() {
   const artistName = usePlayerStore((s) => s.currentArtistName) || "Unknown artist";
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying);
-  const nextInQueue = usePlayerStore((s) => s.nextInQueue);
-  const prevInQueue = usePlayerStore((s) => s.prevInQueue);
-  const setNowPlaying = usePlayerStore((s) => s.setNowPlaying);
   const currentSongId = usePlayerStore((s) => s.currentSongId);
   const playbackSeconds = usePlayerStore((s) => s.playbackSeconds);
-  const setPlaybackSeconds = usePlayerStore((s) => s.setPlaybackSeconds);
   const queue = usePlayerStore((s) => s.queueSongIds);
   const [repeat, setRepeat] = useState(false);
   const [shuffle, setShuffle] = useState(false);
@@ -26,13 +25,14 @@ export default function FullPlayerScreen() {
   const [lyricsLines, setLyricsLines] = useState<SyncedLyricLine[]>([]);
   const scrollRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    if (!isPlaying) return;
-    const timer = setInterval(() => {
-      setPlaybackSeconds(usePlayerStore.getState().playbackSeconds + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isPlaying, setPlaybackSeconds]);
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        const p = await getMyProfile();
+        if (p?.id) usePlayerStore.getState().setPlaybackProfileId(p.id);
+      })();
+    }, [])
+  );
 
   useEffect(() => {
     if (!currentSongId) return;
@@ -62,8 +62,7 @@ export default function FullPlayerScreen() {
           <Pressable
             style={styles.control}
             onPress={() => {
-              const prev = prevInQueue();
-              if (prev) setNowPlaying(prev, `Song ${prev.slice(0, 6)}`, "Queue Artist");
+              void playPrevTrackFromQueue();
             }}
           >
             <AppText>Prev</AppText>
@@ -74,8 +73,7 @@ export default function FullPlayerScreen() {
           <Pressable
             style={styles.control}
             onPress={() => {
-              const next = nextInQueue();
-              if (next) setNowPlaying(next, `Song ${next.slice(0, 6)}`, "Queue Artist");
+              void playNextTrackFromQueue();
             }}
           >
             <AppText>Next</AppText>

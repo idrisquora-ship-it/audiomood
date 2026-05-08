@@ -11,6 +11,7 @@ export default function SignupScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ accountType?: string }>();
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,9 +22,15 @@ export default function SignupScreen() {
   const onSubmit = async () => {
     try {
       setLoading(true);
-      const res = await signUp({ email, username, password, accountType });
+      const res = await signUp({
+        email,
+        username,
+        displayName: displayName.trim() || username.trim(),
+        password,
+        accountType
+      });
       if (!res.user?.id) throw new Error("Signup did not return a user id.");
-      await bootstrapNewUser(res.user.id, accountType, username);
+      await bootstrapNewUser(res.user.id, accountType, username, displayName.trim() || username.trim());
       router.replace(accountType === "artist" ? "/(onboarding)/artist" : "/(onboarding)/listener");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to signup.";
@@ -40,6 +47,13 @@ export default function SignupScreen() {
         <AppText style={styles.title}>Create account</AppText>
         <AppText muted>Account type: {accountType}</AppText>
         <TextInput placeholder="Email" placeholderTextColor={colors.textMuted} style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" />
+        <TextInput
+          placeholder="Display name"
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+          value={displayName}
+          onChangeText={setDisplayName}
+        />
         <TextInput placeholder="Username" placeholderTextColor={colors.textMuted} style={styles.input} value={username} onChangeText={setUsername} autoCapitalize="none" />
         <View style={styles.passwordWrap}>
           <TextInput

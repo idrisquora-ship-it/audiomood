@@ -14,7 +14,7 @@ export type UiSongStatus =
 const LABELS: Record<UiSongStatus, string> = {
   draft: "Draft",
   processing_lyrics: "Lyrics",
-  pending_review: "Review",
+  pending_review: "Live",
   approved: "Live",
   rejected: "Rejected",
   hidden: "Hidden"

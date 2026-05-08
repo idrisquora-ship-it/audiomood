@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { Link, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { DiscoverFeatureCard } from "@/components/discover/DiscoverFeatureCard";
 import { MiniPlayer } from "@/components/player/MiniPlayer";
 import { ArtistCircle } from "@/components/music/ArtistCircle";
-import { DEMO_ARTISTS, DEMO_SONGS } from "@/constants/demoContent";
 import { EmptyStateCard } from "@/components/ui/EmptyStateCard";
 import { SongRow } from "@/components/music/SongRow";
 import { Screen } from "@/components/ui/Screen";
@@ -14,10 +14,16 @@ import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
 import { AppText } from "@/components/ui/AppText";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionCard } from "@/components/cards/SectionCard";
-import { getMyProfile } from "@/features/auth/authService";
+import { ensureProfileForSession } from "@/features/auth/authService";
 import { likeSong, unlikeSong } from "@/features/music/likedSongsService";
 import { ensureSongDownloaded } from "@/features/music/downloadService";
-import { getApprovedSongs, playSongFromHome } from "@/features/music/songService";
+import {
+  getApprovedSongs,
+  getArtistNameMap,
+  getFeaturedArtistCircles,
+  gradientForSongId,
+  playSongFromHome
+} from "@/features/music/songService";
 import { getPodcasts, type PodcastShow } from "@/features/podcasts/podcastService";
 import { createReport } from "@/features/social/socialService";
 import { useUiStore } from "@/store/uiStore";
@@ -29,6 +35,7 @@ type SongLite = {
   title: string;
   like_count: number;
   audio_path: string;
+  artist_id: string;
 };
 
 const UUID_RE =
@@ -37,42 +44,58 @@ const UUID_RE =
 export default function ListenerDiscoverScreen() {
   const router = useRouter();
   const [songs, setSongs] = useState<SongLite[]>([]);
+  const [artistLookup, setArtistLookup] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [profileId, setProfileId] = useState("");
   const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
   const [podcasts, setPodcasts] = useState<PodcastShow[]>([]);
+  const [featuredArtists, setFeaturedArtists] = useState<Array<{ id: string; name: string; initial: string; gradient: [string, string] }>>(
+    []
+  );
   const pushToast = useUiStore((s) => s.pushToast);
 
-  useEffect(() => {
-    void (async () => {
-      const profile = await getMyProfile();
-      if (profile?.id) setProfileId(profile.id);
-      try {
-        const rows = await getApprovedSongs(22);
-        const podcastRows = await getPodcasts(8);
-        setSongs(rows as SongLite[]);
-        setPodcasts(podcastRows);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void (async () => {
+        setLoading(true);
+        const ensured = await ensureProfileForSession();
+        const pid = ensured?.id ?? "";
+        setProfileId(pid);
+        try {
+          const rows = (await getApprovedSongs(40)) as SongLite[];
+          const artistIds = [...new Set(rows.map((r) => r.artist_id).filter(Boolean))];
+          let names: Record<string, string> = {};
+          if (artistIds.length) {
+            names = await getArtistNameMap(artistIds);
+          }
+          const podcastRows = await getPodcasts(8).catch(() => [] as PodcastShow[]);
+          const circles = await getFeaturedArtistCircles(12).catch(() => []);
 
-  const browseSongs = useMemo(() => {
-    if (songs.length > 0) return songs;
-    return DEMO_SONGS.map((d, idx) => ({
-      id: d.id,
-      title: d.title,
-      like_count: 120 + idx * 11,
-      audio_path: ""
-    }));
-  }, [songs]);
+          if (cancelled) return;
+          setSongs(rows);
+          setArtistLookup(names);
+          setPodcasts(podcastRows ?? []);
+          setFeaturedArtists(
+            circles.map((a) => ({ id: a.id, name: a.name, initial: a.initial, gradient: a.gradient }))
+          );
+        } catch (e) {
+          if (!cancelled) pushToast(e instanceof Error ? e.message : "Discover failed to load", "error");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [pushToast])
+  );
 
-  const gradientForIndex = (i: number) => DEMO_SONGS[i % DEMO_SONGS.length].gradient;
+  const browseSongs = useMemo(() => songs, [songs]);
 
   const toggleLike = async (songId: string) => {
     if (!profileId || !UUID_RE.test(songId)) {
-      pushToast("Like tracks once they are synced from Audiomood artists.", "info");
+      pushToast("Sign in to like songs.", "info");
       return;
     }
     const isLiked = likedMap[songId];
@@ -87,19 +110,19 @@ export default function ListenerDiscoverScreen() {
   };
 
   const playSongRow = async (song: SongLite) => {
-    if (!UUID_RE.test(song.id)) {
-      pushToast("Add your own uploads in Studio to populate this lane.", "info");
-      router.push("/(listener)/(tabs)/home");
+    if (!UUID_RE.test(song.id)) return;
+    if (!profileId) {
+      pushToast("Sign in to play music.", "info");
+      router.replace("/(auth)/welcome");
       return;
     }
-    if (!profileId) return pushToast("Sign in to play.", "error");
     const res = await playSongFromHome(profileId, song.id);
-    if (!res.ok) pushToast("Download this song or disable offline-only mode.", "error");
+    if (!res.ok) pushToast("Can't play — check offline mode or download the track.", "error");
   };
 
   const downloadSong = async (song: SongLite) => {
     if (!profileId || !UUID_RE.test(song.id)) {
-      pushToast("Downloads activate only for uploaded tracks.", "info");
+      pushToast("Sign in to download.", "info");
       return;
     }
     await ensureSongDownloaded(profileId, song.id, song.audio_path).then(() =>
@@ -110,44 +133,36 @@ export default function ListenerDiscoverScreen() {
   return (
     <Screen edges={["top", "left", "right"]}>
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.sectionGap * 4 }}>
-        <AppHeader title="Discover" subtitle="Find new sounds, moods, and creators curated for listeners." />
+        <AppHeader title="Discover" subtitle="Approved tracks from Audiomood artists and your hub links." />
 
         <DiscoverFeatureCard
-          icon="radio-outline"
-          title="Start AI Mood Radio"
-          description="Infinite blend based on moods, skips, saves, and time of day."
-          ctaLabel="Start"
-          onPress={() => router.push("/mood-radio")}
-        />
-        <DiscoverFeatureCard
-          icon="people-outline"
-          title="Listening Parties"
-          description="Host or join synced rooms with fans around the globe."
-          ctaLabel="Join session"
-          onPress={() => router.push("/listening-parties")}
-        />
-        <DiscoverFeatureCard
-          icon="mic-outline"
-          title="Live Audio Rooms"
-          description="Press play on live chats, demos, AMAs and launch nights."
-          ctaLabel="Explore"
-          onPress={() => router.push("/live-rooms")}
+          icon="settings-outline"
+          title="Listening preferences"
+          description="Playback, moods, podcasts, privacy, downloads, subscription & support live in Settings."
+          ctaLabel="Open Settings"
+          onPress={() => router.push("/settings")}
         />
 
         <SectionHeader title="Charts & spotlight" />
 
         <SectionCard title="Spotlight playlists">
           <AppText secondary variant="body">
-            Hand-picked ladders refresh daily — Follow artists to personalize this stack.
+            Saved playlists appear in Library. Create playlists from your profile tab.
           </AppText>
         </SectionCard>
 
-        <SectionCard title="Independent artists">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {DEMO_ARTISTS.map((a, i) => (
-              <ArtistCircle key={a.id} name={a.name} initial={a.initial} gradient={gradientForIndex(i)} />
-            ))}
-          </ScrollView>
+        <SectionCard title="Featured artists">
+          {featuredArtists.length === 0 ? (
+            <AppText secondary variant="caption">
+              No artists in the spotlight yet.
+            </AppText>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {featuredArtists.map((a, i) => (
+                <ArtistCircle key={a.id} name={a.name} initial={a.initial} gradient={a.gradient} />
+              ))}
+            </ScrollView>
+          )}
         </SectionCard>
 
         <SectionHeader title="Podcasts" />
@@ -155,9 +170,9 @@ export default function ListenerDiscoverScreen() {
           {podcasts.length === 0 ? (
             <EmptyStateCard
               icon="mic-outline"
-              title="Shows land here automatically"
-              description="Catch new voices as creators publish on Audiomood."
-              ctaLabel="Browse podcasts hub"
+              title="No podcasts published"
+              description="Shows appear automatically when creators add them."
+              ctaLabel="Open podcasts"
               onCtaPress={() => router.push("/podcasts")}
             />
           ) : (
@@ -166,7 +181,7 @@ export default function ListenerDiscoverScreen() {
                 <Pressable style={styles.podRow}>
                   <AppText variant="body">{podcast.title}</AppText>
                   <AppText secondary variant="caption" numberOfLines={2}>
-                    {podcast.description ?? "Tap to binge episodes"}
+                    {podcast.description ?? "Tap for episodes"}
                   </AppText>
                 </Pressable>
               </Link>
@@ -183,14 +198,18 @@ export default function ListenerDiscoverScreen() {
             <SkeletonBlock style={{ height: 72 }} />
           </View>
         ) : browseSongs.length === 0 ? (
-          <EmptyStateCard icon="albums-outline" title="Quiet out there" description="Uploads will appear instantly when artists publish." />
+          <EmptyStateCard
+            icon="albums-outline"
+            title="No tracks in the catalogue"
+            description="Uploads from artists show up here as soon as they are published."
+          />
         ) : (
           browseSongs.map((song, idx) => (
             <View key={song.id} style={{ marginBottom: 8 }}>
               <SongRow
                 title={song.title}
-                artist="Audiomood artist"
-                gradient={gradientForIndex(idx)}
+                artist={artistLookup[song.artist_id] ?? "Artist"}
+                gradient={gradientForSongId(song.id)}
                 rank={idx + 1}
                 onPress={() => void playSongRow(song)}
               />
@@ -200,20 +219,23 @@ export default function ListenerDiscoverScreen() {
                   title="Comments"
                   style={styles.compactBtn}
                   onPress={() => {
-                    if (!UUID_RE.test(song.id)) {
-                      pushToast("Comments unlock when the track is uploaded to Audiomood.", "info");
-                      return;
-                    }
                     router.push(`/song/${song.id}`);
                   }}
                 />
-                <PrimaryButton variant="outline" title={likedMap[song.id] ? "Unlike" : "Like"} style={styles.compactBtn} onPress={() => void toggleLike(song.id)} />
+                <PrimaryButton
+                  variant="outline"
+                  title={likedMap[song.id] ? "Unlike" : "Like"}
+                  style={styles.compactBtn}
+                  onPress={() => void toggleLike(song.id)}
+                />
                 <PrimaryButton variant="outline" title="Save offline" style={styles.compactBtn} onPress={() => void downloadSong(song)} />
-                <PrimaryButton variant="outline" title="Report" style={styles.compactBtn}
+                <PrimaryButton
+                  variant="outline"
+                  title="Report"
+                  style={styles.compactBtn}
                   onPress={() => {
-                    if (!profileId) return;
-                    if (!UUID_RE.test(song.id)) {
-                      pushToast("Reporting is available for published tracks.", "info");
+                    if (!profileId) {
+                      pushToast("Sign in to report.", "info");
                       return;
                     }
                     void createReport(profileId, "song", song.id, "inappropriate song");

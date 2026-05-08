@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Screen } from "@/components/ui/Screen";
-import { getMyProfile, saveListenerPreferences } from "@/features/auth/authService";
+import { ensureProfileForSession, getMyProfile, saveListenerPreferences } from "@/features/auth/authService";
 import { supabase } from "@/lib/supabase";
 import { colors } from "@/theme/colors";
 
@@ -38,6 +38,10 @@ export default function ListenerOnboardingScreen() {
   }, []);
 
   useEffect(() => {
+    void ensureProfileForSession();
+  }, []);
+
+  useEffect(() => {
     void fetchCatalog();
   }, [fetchCatalog]);
 
@@ -49,6 +53,7 @@ export default function ListenerOnboardingScreen() {
   const onContinue = async () => {
     try {
       setLoadingPrefs(true);
+      await ensureProfileForSession();
       const profile = await getMyProfile();
       if (!profile?.id) throw new Error("Could not load user profile.");
       await saveListenerPreferences(profile.id, genreSelection, moodSelection);

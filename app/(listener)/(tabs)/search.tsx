@@ -7,7 +7,7 @@ import { Screen } from "@/components/ui/Screen";
 import { AppText } from "@/components/ui/AppText";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { SectionCard } from "@/components/cards/SectionCard";
-import { DEMO_BROWSE_GENRES } from "@/constants/demoContent";
+import { supabase } from "@/lib/supabase";
 import { searchPodcasts, type PodcastShow } from "@/features/podcasts/podcastService";
 import { colors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
@@ -34,6 +34,19 @@ export default function ListenerSearchScreen() {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("songs");
   const [podcastResults, setPodcastResults] = useState<PodcastShow[]>([]);
+  const [genreNames, setGenreNames] = useState<string[]>([]);
+  const [moodNames, setMoodNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const [gRes, mRes] = await Promise.all([
+        supabase.from("genres").select("name").order("name").limit(24),
+        supabase.from("moods").select("name").order("name").limit(24)
+      ]);
+      setGenreNames((gRes.data ?? []).map((r: { name: string }) => r.name).filter(Boolean));
+      setMoodNames((mRes.data ?? []).map((r: { name: string }) => r.name).filter(Boolean));
+    })();
+  }, []);
 
   useEffect(() => {
     if (tab !== "podcasts") return;
@@ -95,14 +108,14 @@ export default function ListenerSearchScreen() {
 
         <SectionHeaderLocal title="Browse by mood" />
         <View style={styles.grid}>
-          {["Chill", "Romantic", "Workout", "Focus", "Party", "Late Night"].map((m) => (
+          {(moodNames.length ? moodNames.slice(0, 12) : ["Add moods via Supabase"]).map((m) => (
             <BrowseTile key={m} title={m} tag="Mood" />
           ))}
         </View>
 
         <SectionHeaderLocal title="Browse by genre" />
         <View style={styles.grid}>
-          {DEMO_BROWSE_GENRES.map((g) => (
+          {(genreNames.length ? genreNames.slice(0, 12) : ["Add genres via Supabase"]).map((g) => (
             <BrowseTile key={g} title={g} tag="Genre" />
           ))}
         </View>

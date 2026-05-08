@@ -91,7 +91,7 @@ export default function ArtistMusicScreen() {
 
   const songBuckets = useMemo(() => {
     const drafts = songs.filter((s) => ["draft", "uploading"].includes(s.status));
-    const reviews = songs.filter((s) => ["processing_lyrics", "pending_review"].includes(s.status));
+    const reviews = songs.filter((s) => s.status === "processing_lyrics");
     const dr = new Set(drafts.map((s) => s.id));
     const rv = new Set(reviews.map((s) => s.id));
     const catalog = songs.filter((s) => !dr.has(s.id) && !rv.has(s.id));
@@ -162,13 +162,18 @@ export default function ArtistMusicScreen() {
       >
         <AppHeader
           title="Your Music"
-          subtitle="Organize your releases, monitor review status, and curate albums without losing momentum."
+          subtitle="Organize releases, see what is still generating lyrics, and manage albums in one place."
         />
         <PrimaryButton title="Upload song" onPress={() => router.push("/(artist)/(tabs)/upload")} />
 
         <View style={styles.tabs}>
           {(["songs", "albums", "drafts", "reviews"] as TabKey[]).map((key) => (
-            <MoodChip key={key} label={key === "songs" ? "Songs" : key === "albums" ? "Albums" : key === "drafts" ? "Drafts" : "Reviews"} active={tab === key} onPress={() => setTab(key)} />
+            <MoodChip
+              key={key}
+              label={key === "songs" ? "Songs" : key === "albums" ? "Albums" : key === "drafts" ? "Drafts" : "Lyrics"}
+              active={tab === key}
+              onPress={() => setTab(key)}
+            />
           ))}
         </View>
 
@@ -176,7 +181,7 @@ export default function ArtistMusicScreen() {
           <EmptyStateCard
             icon="musical-notes-outline"
             title="No music uploaded yet"
-            description="Organize singles, drafts, and review-ready uploads from one calming workspace."
+            description="Publish singles, manage drafts, and bundle albums from one workspace."
             ctaLabel="Upload song"
             onCtaPress={() => router.push("/(artist)/(tabs)/upload")}
           />
@@ -186,7 +191,7 @@ export default function ArtistMusicScreen() {
           <View style={{ gap: spacing.itemGap }}>
             {visibleSongs.length === 0 ? (
               <AppText secondary variant="body">
-                No published catalogue entries yet — finish review or flip to the Reviews tab for pending uploads.
+                Nothing in your live catalogue yet — finish a draft or publish from Upload.
               </AppText>
             ) : (
               visibleSongs.map((song) => (
@@ -230,8 +235,8 @@ export default function ArtistMusicScreen() {
             {songBuckets.reviews.length === 0 ? (
               <EmptyStateCard
                 icon="hourglass-outline"
-                title="No pending reviews"
-                description="Anything awaiting moderation pops up instantly so you stay ahead of inbox delays."
+                title="Nothing generating lyrics"
+                description="When you turn on auto-lyrics on upload, those tracks appear here until generation finishes."
               />
             ) : (
               songBuckets.reviews.map((song) => (

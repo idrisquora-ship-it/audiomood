@@ -67,9 +67,7 @@ export default function ArtistDashboardScreen() {
       followers: String((followersRes.data ?? []).length),
       monthlyListeners: String(artist.data.monthly_listeners ?? 0)
     });
-    const pend = list.filter((s) =>
-      ["draft", "uploading", "processing_lyrics", "pending_review"].includes(s.status)
-    );
+    const pend = list.filter((s) => s.status === "processing_lyrics");
     setPending(pend);
 
     const songIds = list.map((s) => s.id);
@@ -142,7 +140,7 @@ export default function ArtistDashboardScreen() {
 
         <DashboardActionCard
           title="Ready to release your next track?"
-          subtitle="Upload music, generate lyrics where enabled, and send your release through review."
+          subtitle="Upload music and optional auto-lyrics — new tracks go live on the catalogue right away."
           ctaLabel="Upload song"
           onCtaPress={() => router.push("/(artist)/(tabs)/upload")}
         />
@@ -185,10 +183,10 @@ export default function ArtistDashboardScreen() {
           )}
         </SectionCard>
 
-        <SectionCard title="Pending reviews">
+        <SectionCard title="Lyrics in progress">
           {pending.length === 0 ? (
             <AppText secondary variant="body">
-              No uploads waiting for moderator review — you’re caught up!
+              No uploads are waiting on auto-generated lyrics right now.
             </AppText>
           ) : (
             <View style={{ gap: spacing.itemGap }}>

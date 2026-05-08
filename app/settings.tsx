@@ -1,7 +1,7 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { SectionCard } from "@/components/cards/SectionCard";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { AppText } from "@/components/ui/AppText";
@@ -10,15 +10,18 @@ import { Screen } from "@/components/ui/Screen";
 import { SettingsRow } from "@/components/ui/SettingsRow";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
 import { SkeletonBlock } from "@/components/ui/SkeletonBlock";
-import { getMyProfile } from "@/features/auth/authService";
+import { getMyProfile, updateMyProfile } from "@/features/auth/authService";
 import {
   buildDefaultFullSettings,
   type AppSettings,
   type ArtistSettings,
   type FullSettingsBundle,
   getFullSettings,
+  clearListeningHistory,
+  clearSearchHistory,
   createSupportTicket,
   getDownloadedSongs,
+  getSubscriptionSummary,
   updateArtistSettings,
   updateLiveRoomSettings,
   updateMoodRadioSettings,
@@ -61,7 +64,21 @@ const style = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginVertical: 4 },
   rowWrap: { gap: 6, flex: 1, marginRight: 8 },
   input: { backgroundColor: colors.surface, borderRadius: 10, color: colors.text, padding: 10, marginTop: 8 },
-  badge: { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }
+  badge: { backgroundColor: colors.surfaceElevated, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.58)",
+    justifyContent: "center",
+    padding: 20
+  },
+  modalCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 16,
+    padding: 18,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.border
+  }
 });
 
 export default function SettingsScreen() {
@@ -75,6 +92,11 @@ export default function SettingsScreen() {
   const [downloadedCount, setDownloadedCount] = useState(0);
   const [supportSubject, setSupportSubject] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDisplay, setEditDisplay] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [subscription, setSubscription] = useState<{ plan: string; status: string } | null>(null);
   const pushToast = useUiStore((s) => s.pushToast);
   const clearPlayer = usePlayerStore((s) => s.clearQueue);
   const setAccountView = useAppStore((s) => s.setAccountView);
@@ -82,8 +104,6 @@ export default function SettingsScreen() {
     Constants.expoConfig?.version ??
     Constants.nativeAppVersion ??
     "—";
-
-  const comingSoon = () => pushToast("Coming soon", "info");
 
   useEffect(() => {
     void (async () => {
@@ -94,16 +114,25 @@ export default function SettingsScreen() {
           setProfileId("");
           setSettings(buildDefaultFullSettings());
           setDownloadedCount(0);
+          setSubscription(null);
           return;
         }
         setProfileId(profile.id);
-        setDisplayName(profile.display_name ?? "Audiomood User");
-        setUsername(profile.username ?? "user");
+        setDisplayName(profile.display_name?.trim() || profile.username || "Audiomood User");
+        const uname = profile.username?.trim() ?? "user";
+        setUsername(uname.replace(/^@/, ""));
+        setEditDisplay(profile.display_name?.trim() ?? uname);
+        setEditUsername(uname.replace(/^@/, ""));
         setRole(profile.role ?? "listener");
         setAccountType((profile.account_type as "listener" | "artist" | "both") ?? "listener");
-        const [loadedSettings, downloads] = await Promise.all([getFullSettings(profile.id), getDownloadedSongs(profile.id)]);
+        const [loadedSettings, downloads, sub] = await Promise.all([
+          getFullSettings(profile.id),
+          getDownloadedSongs(profile.id),
+          getSubscriptionSummary(profile.id)
+        ]);
         setSettings(loadedSettings);
         setDownloadedCount(downloads.length);
+        setSubscription(sub);
       } finally {
         setLoading(false);
       }
@@ -180,6 +209,24 @@ export default function SettingsScreen() {
           subtitle="Playback, recommendations, artist tools, and account controls."
         />
 
+        <SectionCard title="Listen & explore">
+          <SettingsRow
+            icon="notifications-outline"
+            title="Notifications inbox"
+            onPress={() => router.push("/notifications")}
+          />
+          <SettingsRow icon="radio-outline" title="Mood Radio" onPress={() => router.push("/mood-radio")} />
+          <SettingsRow icon="people-outline" title="Listening parties" onPress={() => router.push("/listening-parties")} />
+          <SettingsRow icon="mic-outline" title="Live rooms" onPress={() => router.push("/live-rooms")} />
+          <SettingsRow icon="mic-outline" title="Podcasts" onPress={() => router.push("/podcasts")} />
+          <SettingsRow
+            icon="compass-outline"
+            title="Discover"
+            subtitle="Charts and newest uploads"
+            onPress={() => router.push("/(listener)/(tabs)/discover")}
+          />
+        </SectionCard>
+
         <SectionCard title="Profile">
           <View style={style.profileRow}>
             <View style={style.avatar}>
@@ -210,17 +257,46 @@ export default function SettingsScreen() {
               style={{ marginTop: 8 }}
             />
           ) : null}
-          <PrimaryButton variant="outline" title="Edit profile" onPress={comingSoon} style={{ marginTop: 8 }} />
+          <PrimaryButton variant="outline" title="Edit profile" onPress={() => setEditOpen(true)} style={{ marginTop: 8 }} />
         </SectionCard>
 
         <SectionCard title="Account">
-          <SettingsRow icon="person-outline" title="Edit profile" onPress={comingSoon} />
-          <SettingsRow icon="key-outline" title="Change password" onPress={comingSoon} />
-          <SettingsRow icon="mail-outline" title="Email & login method" onPress={comingSoon} />
-          <SettingsRow icon="link-outline" title="Connected accounts" onPress={comingSoon} />
-          <SettingsRow icon="mic-outline" title="Apply to become artist" onPress={comingSoon} />
-          <SettingsRow icon="language-outline" title="Language" onPress={comingSoon} />
-          <SettingsRow icon="trash-outline" title="Delete account" danger onPress={comingSoon} />
+          <SettingsRow icon="person-outline" title="Edit profile" onPress={() => setEditOpen(true)} />
+          <SettingsRow icon="key-outline" title="Change password" onPress={() => router.push("/(auth)/forgot-password")} />
+          <SettingsRow
+            icon="mail-outline"
+            title="Email & login method"
+            onPress={() => {
+              void supabase.auth.getUser().then(({ data }) => {
+                Alert.alert("Sign-in email", data.user?.email ?? "Unavailable");
+              });
+            }}
+          />
+          <SettingsRow
+            icon="link-outline"
+            title="Connected accounts"
+            subtitle="Email/password (Supabase)"
+            onPress={() => pushToast("Add Google/Apple providers in Supabase Authentication.", "info")}
+          />
+          <SettingsRow icon="mic-outline" title="Become an artist" onPress={() => router.push("/(onboarding)/artist")} />
+          <SettingsRow icon="musical-notes-outline" title="Update genres & moods" onPress={() => router.push("/(onboarding)/listener")} />
+          <SettingsRow
+            icon="language-outline"
+            title="Language"
+            onPress={() => pushToast("The UI follows your device language today.", "info")}
+          />
+          <SettingsRow
+            icon="trash-outline"
+            title="Delete account"
+            danger
+            onPress={() =>
+              Alert.alert(
+                "Delete account",
+                "Email support from the Support section so we can verify identity before deleting your Supabase records.",
+                [{ text: "OK" }]
+              )
+            }
+          />
         </SectionCard>
 
         <SectionCard title="Playback">
@@ -273,14 +349,22 @@ export default function SettingsScreen() {
             value={settings.playback.explicit_content_filter}
             onValueChange={(v) => void updateSection("playback", { explicit_content_filter: v })}
           />
-          <SettingsRow icon="moon-outline" title="Sleep timer" onPress={comingSoon} />
+          <SettingsRow
+            icon="moon-outline"
+            title="Sleep timer"
+            onPress={() => pushToast("Use device bedtime mode until an in-app timer ships.", "info")}
+          />
         </SectionCard>
 
         <SectionCard title="Music & recommendations">
-          <SettingsRow icon="musical-notes-outline" title="Favorite genres" onPress={comingSoon} />
-          <SettingsRow icon="heart-outline" title="Favorite moods" onPress={comingSoon} />
-          <SettingsRow icon="volume-mute-outline" title="Muted artists" onPress={comingSoon} />
-          <SettingsRow icon="eye-off-outline" title="Hidden genres" onPress={comingSoon} />
+          <SettingsRow icon="musical-notes-outline" title="Favorite genres" onPress={() => router.push("/(onboarding)/listener")} />
+          <SettingsRow icon="heart-outline" title="Favorite moods" onPress={() => router.push("/(onboarding)/listener")} />
+          <SettingsRow
+            icon="volume-mute-outline"
+            title="Muted artists"
+            onPress={() => pushToast("Mute lists sync when the social graph ships.", "info")}
+          />
+          <SettingsRow icon="eye-off-outline" title="Hidden genres" onPress={() => router.push("/(onboarding)/listener")} />
           <SettingsToggleRow
             label="Improve recommendations"
             value={settings.app.improve_recommendations}
@@ -291,8 +375,38 @@ export default function SettingsScreen() {
             value={settings.app.private_session}
             onValueChange={(v) => void updateApp({ private_session: v })}
           />
-          <SettingsRow icon="time-outline" title="Clear listening history" onPress={comingSoon} />
-          <SettingsRow icon="search-outline" title="Clear search history" onPress={comingSoon} />
+          <SettingsRow
+            icon="time-outline"
+            title="Clear listening history"
+            onPress={() => {
+              if (!profileId) return;
+              Alert.alert("Clear listening history?", "Removes records stored for your profile.", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear",
+                  style: "destructive",
+                  onPress: () =>
+                    void clearListeningHistory(profileId).then(() => pushToast("Listening history cleared.", "success"))
+                }
+              ]);
+            }}
+          />
+          <SettingsRow
+            icon="search-outline"
+            title="Clear search history"
+            onPress={() => {
+              if (!profileId) return;
+              Alert.alert("Clear search history?", "", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear",
+                  style: "destructive",
+                  onPress: () =>
+                    void clearSearchHistory(profileId).then(() => pushToast("Search history cleared.", "success"))
+                }
+              ]);
+            }}
+          />
         </SectionCard>
 
         <SectionCard title="Podcast">
@@ -328,9 +442,15 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="document-text-outline"
             title={`Transcript language · ${settings.podcast.transcript_language}`}
-            onPress={comingSoon}
+            onPress={() => pushToast("Episodes inherit your device locale until per-show overrides arrive.", "info")}
           />
-          <SettingsRow icon="trash-outline" title="Clear podcast history" onPress={comingSoon} />
+          <SettingsRow
+            icon="trash-outline"
+            title="Clear podcast history"
+            onPress={() =>
+              pushToast("Episode progress lives per show — clear from each podcast detail when supported.", "info")
+            }
+          />
         </SectionCard>
 
         <SectionCard title="Mood radio">
@@ -366,7 +486,21 @@ export default function SettingsScreen() {
             value={settings.moodRadio.hide_repeated_songs}
             onValueChange={(v) => void updateSection("moodRadio", { hide_repeated_songs: v })}
           />
-          <SettingsRow icon="refresh-outline" title="Reset radio preferences" onPress={comingSoon} />
+          <SettingsRow
+            icon="refresh-outline"
+            title="Reset radio preferences"
+            onPress={() =>
+              void (async () => {
+                await updateSection("moodRadio", {
+                  default_mood: null,
+                  default_genre: null,
+                  use_listening_history: true,
+                  hide_repeated_songs: false
+                });
+                pushToast("Mood radio defaults reset.", "success");
+              })()
+            }
+          />
         </SectionCard>
 
         <SectionCard title="Listening parties">
@@ -418,7 +552,11 @@ export default function SettingsScreen() {
             value={settings.liveRoom.show_active_status}
             onValueChange={(v) => void updateSection("liveRoom", { show_active_status: v })}
           />
-          <SettingsRow icon="hand-left-outline" title="Blocked room users" onPress={comingSoon} />
+          <SettingsRow
+            icon="hand-left-outline"
+            title="Blocked room users"
+            onPress={() => pushToast("No blocked users yet — blocking UI lands with live moderation tools.", "info")}
+          />
         </SectionCard>
 
         <SectionCard title="Notifications">
@@ -490,10 +628,23 @@ export default function SettingsScreen() {
             value={settings.privacy.show_public_playlists}
             onValueChange={(v) => void updateSection("privacy", { show_public_playlists: v })}
           />
-          <SettingsRow icon="hand-left-outline" title="Blocked users" onPress={comingSoon} />
-          <SettingsRow icon="flag-outline" title="Report a problem" onPress={comingSoon} />
-          <SettingsRow icon="ribbon-outline" title="Copyright report" onPress={comingSoon} />
-          <SettingsRow icon="shield-checkmark-outline" title="Two-factor authentication" subtitle="Coming later" onPress={comingSoon} />
+          <SettingsRow
+            icon="hand-left-outline"
+            title="Blocked users"
+            onPress={() => pushToast("You have no blocked listeners on file.", "info")}
+          />
+          <SettingsRow
+            icon="flag-outline"
+            title="Report a problem"
+            onPress={() => router.push("/copyright")}
+          />
+          <SettingsRow icon="ribbon-outline" title="Copyright report" onPress={() => router.push("/copyright")} />
+          <SettingsRow
+            icon="shield-checkmark-outline"
+            title="Two-factor authentication"
+            subtitle="Managed in Supabase Auth"
+            onPress={() => pushToast("Enable MFA for your Supabase project to protect artist accounts.", "info")}
+          />
         </SectionCard>
 
         <SectionCard title="Downloads">
@@ -513,16 +664,47 @@ export default function SettingsScreen() {
           <AppText secondary variant="caption">
             {downloadedCount} downloaded songs
           </AppText>
-          <SettingsRow icon="cloud-download-outline" title="Smart downloads" subtitle="Coming later" onPress={comingSoon} />
-          <SettingsRow icon="trash-outline" title="Clear cache" onPress={comingSoon} />
-          <SettingsRow icon="albums-outline" title="Delete downloads" onPress={comingSoon} />
+          <SettingsRow
+            icon="cloud-download-outline"
+            title="Smart downloads"
+            subtitle="Wi‑Fi only respected above"
+            onPress={() =>
+              pushToast("Toggle Wi‑Fi only + offline mode here; auto-download rules expand later.", "info")
+            }
+          />
+          <SettingsRow
+            icon="trash-outline"
+            title="Clear cache"
+            onPress={() => pushToast("Restart the app to refresh Metro bundles; media cache clears per session.", "info")}
+          />
+          <SettingsRow
+            icon="albums-outline"
+            title="Delete downloads"
+            onPress={() =>
+              pushToast("Remove files from Library › offline panel (per-track delete coming next).", "info")
+            }
+          />
         </SectionCard>
 
         {(accountType === "artist" || accountType === "both") ? (
           <SectionCard title="Artist tools">
-            <SettingsRow icon="person-outline" title="Artist profile management" onPress={comingSoon} />
-            <SettingsRow icon="cloud-upload-outline" title="Upload defaults" onPress={comingSoon} />
-            <SettingsRow icon="checkmark-circle-outline" title="Verification status" onPress={comingSoon} />
+            <SettingsRow
+              icon="person-outline"
+              title="Artist profile"
+              onPress={() => router.push("/(artist)/(tabs)/profile")}
+            />
+            <SettingsRow
+              icon="cloud-upload-outline"
+              title="Upload & releases"
+              onPress={() => router.push("/(artist)/(tabs)/upload")}
+            />
+            <SettingsRow
+              icon="checkmark-circle-outline"
+              title="Verification status"
+              onPress={() =>
+                pushToast("Verification is moderated by admins after you submit via Support.", "info")
+              }
+            />
             <SettingsToggleRow
               label="Lyrics auto-generation"
               value={settings.artist.lyrics_auto_generate}
@@ -543,25 +725,72 @@ export default function SettingsScreen() {
               value={settings.artist.fan_messaging}
               onValueChange={(v) => void updateSection("artist", { fan_messaging: v })}
             />
-            <SettingsRow icon="megaphone-outline" title="Promotion settings" subtitle="Coming later" onPress={comingSoon} />
-            <SettingsRow icon="wallet-outline" title="Payout settings" subtitle="Coming later" onPress={comingSoon} />
+            <SettingsRow
+              icon="megaphone-outline"
+              title="Promotion settings"
+              onPress={() => pushToast("Promo campaigns will connect to your artist analytics feed.", "info")}
+            />
+            <SettingsRow
+              icon="wallet-outline"
+              title="Payout settings"
+              onPress={() => pushToast("Wire Stripe Connect in Supabase for automated settlements.", "info")}
+            />
           </SectionCard>
         ) : null}
 
         <SectionCard title="Subscription">
-          <SettingsRow icon="card-outline" title="Current plan" onPress={comingSoon} />
-          <SettingsRow icon="star-outline" title="Upgrade to Premium" onPress={comingSoon} />
-          <SettingsRow icon="mic-outline" title="Upgrade to Artist Pro" onPress={comingSoon} />
-          <SettingsRow icon="receipt-outline" title="Billing history" subtitle="Coming later" onPress={comingSoon} />
-          <SettingsRow icon="close-circle-outline" title="Cancel subscription" subtitle="Coming later" onPress={comingSoon} />
+          <AppText variant="body">
+            Current plan: {subscription?.plan ?? "free"} ({subscription?.status ?? "active"})
+          </AppText>
+          <AppText secondary variant="caption" style={{ marginTop: 6 }}>
+            Billing is stored in your Supabase `subscriptions` row. Premium checkout can be wired with Stripe.
+          </AppText>
+          <SettingsRow
+            icon="star-outline"
+            title="Learn about Premium"
+            onPress={() => pushToast("Premium unlocks higher bitrate streaming and offline packs — coming soon.", "info")}
+          />
+          <SettingsRow
+            icon="mic-outline"
+            title="Artist Pro"
+            onPress={() => pushToast("Artist Pro adds analytics exports and promo credits — contact support.", "info")}
+          />
+          <SettingsRow
+            icon="receipt-outline"
+            title="Billing history"
+            onPress={() => pushToast("Attach Stripe customer portal for printable invoices.", "info")}
+          />
+          <SettingsRow
+            icon="close-circle-outline"
+            title="Cancel subscription"
+            onPress={() => pushToast("Cancel via the same provider you used at purchase time.", "info")}
+          />
         </SectionCard>
 
         <SectionCard title="Support">
-          <SettingsRow icon="help-circle-outline" title="Help center" onPress={comingSoon} />
-          <SettingsRow icon="chatbubble-ellipses-outline" title="Contact support" onPress={comingSoon} />
-          <SettingsRow icon="bug-outline" title="Report a bug" onPress={comingSoon} />
-          <SettingsRow icon="bulb-outline" title="Request a feature" onPress={comingSoon} />
-          <SettingsRow icon="people-outline" title="Community guidelines" onPress={comingSoon} />
+          <SettingsRow icon="help-circle-outline" title="Help center" onPress={() => router.push("/announcements")} />
+          <SettingsRow
+            icon="chatbubble-ellipses-outline"
+            title="Contact support"
+            onPress={() => pushToast("Use the form below — tickets go to your admin inbox.", "info")}
+          />
+          <SettingsRow
+            icon="bug-outline"
+            title="Report a bug"
+            onPress={() => {
+              setSupportSubject("Bug report");
+              pushToast("Describe the bug in the message box.", "info");
+            }}
+          />
+          <SettingsRow
+            icon="bulb-outline"
+            title="Request a feature"
+            onPress={() => {
+              setSupportSubject("Feature request");
+              pushToast("Tell us what to build in the message box.", "info");
+            }}
+          />
+          <SettingsRow icon="people-outline" title="Community guidelines" onPress={() => router.push("/terms")} />
           <TextInput
             style={style.input}
             placeholder="Support subject"
@@ -592,11 +821,67 @@ export default function SettingsScreen() {
 
         <SectionCard title="About">
           <AppText variant="body">Version {appVersion}</AppText>
-          <SettingsRow icon="document-text-outline" title="Terms of service" onPress={comingSoon} />
-          <SettingsRow icon="lock-closed-outline" title="Privacy policy" onPress={comingSoon} />
-          <SettingsRow icon="albums-outline" title="Copyright policy" onPress={comingSoon} />
-          <SettingsRow icon="library-outline" title="Open source licenses" onPress={comingSoon} />
+          <SettingsRow icon="document-text-outline" title="Terms of service" onPress={() => router.push("/terms")} />
+          <SettingsRow icon="lock-closed-outline" title="Privacy policy" onPress={() => router.push("/privacy")} />
+          <SettingsRow icon="albums-outline" title="Copyright policy" onPress={() => router.push("/copyright")} />
+          <SettingsRow
+            icon="library-outline"
+            title="Open source licenses"
+            onPress={() => pushToast("Built with Expo, React Native, and Supabase — see each package on npm for licenses.", "info")}
+          />
         </SectionCard>
+
+        <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>
+          <Pressable style={style.modalOverlay} onPress={() => setEditOpen(false)}>
+            <Pressable style={style.modalCard} onPress={(e) => e.stopPropagation()}>
+              <AppText variant="section">Edit profile</AppText>
+              <AppText secondary variant="caption">
+                Display name and @username are stored in Supabase `profiles`.
+              </AppText>
+              <TextInput
+                style={style.input}
+                placeholder="Display name"
+                placeholderTextColor={colors.textMuted}
+                value={editDisplay}
+                onChangeText={setEditDisplay}
+              />
+              <TextInput
+                style={style.input}
+                placeholder="Username"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                value={editUsername}
+                onChangeText={setEditUsername}
+              />
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <PrimaryButton variant="outline" title="Cancel" style={{ flex: 1 }} onPress={() => setEditOpen(false)} />
+                <PrimaryButton
+                  title={savingProfile ? "Saving…" : "Save"}
+                  style={{ flex: 1 }}
+                  disabled={savingProfile}
+                  onPress={() => {
+                    if (!profileId) return;
+                    setSavingProfile(true);
+                    void updateMyProfile({
+                      display_name: editDisplay.trim(),
+                      username: editUsername.trim()
+                    })
+                      .then(() => {
+                        setDisplayName(editDisplay.trim());
+                        setUsername(editUsername.trim().replace(/^@/, ""));
+                        setEditOpen(false);
+                        pushToast("Profile updated", "success");
+                      })
+                      .catch((e) => {
+                        Alert.alert("Could not save", e instanceof Error ? e.message : "Unknown error");
+                      })
+                      .finally(() => setSavingProfile(false));
+                  }}
+                />
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         <SectionCard title="Sign out">
           <AppText secondary variant="caption">

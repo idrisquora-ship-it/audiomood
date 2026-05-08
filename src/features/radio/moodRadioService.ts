@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { applyRadioRecommendationSignal, createNotification } from "@/features/engagement/signalService";
+import { PLAYABLE_SONG_STATUSES } from "@/features/music/playableSongs";
+import { loadSongForPlayback } from "@/features/music/songService";
 import { usePlayerStore } from "@/store/playerStore";
 
 export const moodOptions = ["Chill", "Sad", "Romantic", "Workout", "Prayer", "Party", "Focus", "Late Night", "Motivation"] as const;
@@ -42,7 +44,7 @@ async function buildCandidateSongs(userId: string, mood: string, genre: string |
   let query = supabase
     .from("songs")
     .select("id,title,artist_id,genre_id,mood_id,play_count,like_count,status")
-    .eq("status", "approved")
+    .in("status", [...PLAYABLE_SONG_STATUSES])
     .limit(120);
 
   if (genre) {
@@ -171,8 +173,7 @@ export async function endMoodRadio(sessionId: string) {
   }
 }
 
-export async function playRadioSong(songId: string) {
-  const { data } = await supabase.from("songs").select("id,title").eq("id", songId).single();
-  usePlayerStore.getState().setNowPlaying(songId, data?.title ?? "Mood Radio Song", "Mood Radio");
-  usePlayerStore.getState().setIsPlaying(true);
+export async function playRadioSong(profileId: string, songId: string) {
+  usePlayerStore.getState().setQueue([songId], "single", songId);
+  return loadSongForPlayback(profileId, songId, { autoplay: true });
 }

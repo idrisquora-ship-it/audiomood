@@ -1,5 +1,6 @@
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Screen } from "@/components/ui/Screen";
@@ -7,7 +8,8 @@ import { AppText } from "@/components/ui/AppText";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SettingsRow } from "@/components/ui/SettingsRow";
 import { EmptyStateCard } from "@/components/ui/EmptyStateCard";
-import { getMyProfile } from "@/features/auth/authService";
+import { ensureProfileForSession, getMyProfile } from "@/features/auth/authService";
+import { supabase } from "@/lib/supabase";
 import { createPlaylist, getMyPlaylists } from "@/features/playlists/playlistService";
 import { addAnnouncementComment, getAnnouncements } from "@/features/social/socialService";
 import { useAppStore } from "@/store/appStore";
@@ -26,19 +28,23 @@ export default function ListenerProfileScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [announcements, setAnnouncements] = useState<Array<{ id: string; title: string; message: string }>>([]);
 
-  useEffect(() => {
-    void (async () => {
-      const profile = await getMyProfile();
-      if (!profile?.id) return;
-      setProfileId(profile.id);
-      setDisplayName(profile.display_name ?? profile.username ?? "Listener");
-      setUsername(`@${profile.username ?? "you"}`);
-      const playlists = await getMyPlaylists(profile.id);
-      setPlaylistCount(playlists.filter((p) => !p.is_liked_songs).length);
-      const rows = await getAnnouncements();
-      setAnnouncements(rows as Array<{ id: string; title: string; message: string }>);
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        await ensureProfileForSession();
+        const profile = await getMyProfile();
+        if (!profile?.id) return;
+        setProfileId(profile.id);
+        setDisplayName(profile.display_name?.trim() || profile.username?.trim() || "Listener");
+        const uname = profile.username?.trim();
+        setUsername(uname ? `@${uname.replace(/^@/, "")}` : "@you");
+        const playlists = await getMyPlaylists(profile.id);
+        setPlaylistCount(playlists.filter((p) => !p.is_liked_songs).length);
+        const rows = await getAnnouncements();
+        setAnnouncements(rows as Array<{ id: string; title: string; message: string }>);
+      })();
+    }, [])
+  );
 
   const refreshPlaylists = async () => {
     if (!profileId) return;
@@ -97,18 +103,29 @@ export default function ListenerProfileScreen() {
         />
         <SettingsRow icon="time-outline" title="Recently played" onPress={() => router.push("/(listener)/(tabs)/home")} />
         <SettingsRow icon="heart-outline" title="Liked songs" onPress={() => router.push("/(listener)/(tabs)/library")} />
-        <SettingsRow icon="mic-outline" title="Podcasts" onPress={() => router.push("/podcasts")} />
-        <SettingsRow icon="notifications-outline" title="Notifications" onPress={() => router.push("/notifications")} />
         <SettingsRow icon="megaphone-outline" title="Announcements" subtitle="Official Audiomood news" onPress={() => router.push("/announcements")} />
-        <SettingsRow icon="settings-outline" title="Settings & privacy" onPress={() => router.push("/settings")} />
+        <SettingsRow icon="settings-outline" title="Settings" subtitle="Playback, privacy, downloads & more" onPress={() => router.push("/settings")} />
 
         <SettingsRow
           icon="mic-circle-outline"
           title="Switch to Artist View"
           subtitle="Publish and analyze"
           onPress={() => {
-            setAccountView("artist");
-            router.replace("/(artist)/(tabs)/dashboard");
+            void (async () => {
+              const user = (await supabase.auth.getUser()).data.user;
+              if (!user?.id) return;
+              const { data: artistRow } = await supabase
+                .from("artist_profiles")
+                .select("id")
+                .eq("user_id", user.id)
+                .maybeSingle();
+              if (!artistRow?.id) {
+                router.push("/(onboarding)/artist");
+                return;
+              }
+              setAccountView("artist");
+              router.replace("/(artist)/(tabs)/dashboard");
+            })();
           }}
         />
 

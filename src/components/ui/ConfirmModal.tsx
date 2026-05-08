@@ -6,6 +6,7 @@ type Props = {
   visible: boolean;
   title: string;
   message: string;
+  cancelText?: string;
   confirmText?: string;
   onCancel: () => void;
   onConfirm: () => void;
@@ -15,6 +16,7 @@ export function ConfirmModal({
   visible,
   title,
   message,
+  cancelText = "Cancel",
   confirmText = "Confirm",
   onCancel,
   onConfirm
@@ -27,7 +29,7 @@ export function ConfirmModal({
           <AppText muted>{message}</AppText>
           <View style={styles.row}>
             <Pressable style={styles.button} onPress={onCancel}>
-              <AppText>Cancel</AppText>
+              <AppText>{cancelText}</AppText>
             </Pressable>
             <Pressable style={[styles.button, styles.confirm]} onPress={onConfirm}>
               <AppText>{confirmText}</AppText>

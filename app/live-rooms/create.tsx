@@ -2,8 +2,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
+import { isArtistAccount } from "@/features/auth/permissions";
 import { createLiveRoom } from "@/features/liveRooms/liveRoomService";
 import { useUiStore } from "@/store/uiStore";
 import { colors } from "@/theme/colors";
@@ -14,6 +16,7 @@ export default function CreateLiveRoomScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [roomType, setRoomType] = useState<(typeof roomTypes)[number]>("music_discussion");
+  const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const pushToast = useUiStore((s) => s.pushToast);
 
   return (
@@ -53,14 +56,25 @@ export default function CreateLiveRoomScreen() {
             void (async () => {
               const profile = await getMyProfile();
               if (!profile?.id) return;
+              if (!isArtistAccount(profile.account_type)) {
+                setShowBecomeArtist(true);
+                return;
+              }
               const room = await createLiveRoom(profile.id, title.trim(), description.trim(), roomType);
               pushToast("Live room created", "success");
               router.replace(`/live-rooms/${room.id}`);
             })();
           }}
         >
-          <AppText>Create and Go Live</AppText>
+          <AppText>Go Live</AppText>
         </Pressable>
+
+        <BecomeArtistModal
+          visible={showBecomeArtist}
+          title="Become an Artist to host live rooms"
+          description="Artists can host fan Q&As, album launches, live podcast sessions, and music conversations."
+          onClose={() => setShowBecomeArtist(false)}
+        />
       </View>
     </Screen>
   );

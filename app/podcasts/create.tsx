@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
 import { createPodcastShow } from "@/features/podcasts/podcastService";
@@ -14,6 +15,7 @@ export default function CreatePodcastScreen() {
   const [checkedRole, setCheckedRole] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const pushToast = useUiStore((s) => s.pushToast);
 
   useEffect(() => {
@@ -32,6 +34,9 @@ export default function CreatePodcastScreen() {
         {checkedRole && !allowed ? (
           <View style={styles.block}>
             <AppText muted>Only Artist accounts can create podcast shows.</AppText>
+            <Pressable style={[styles.button, { marginTop: 10 }]} onPress={() => setShowBecomeArtist(true)}>
+              <AppText>Become Artist</AppText>
+            </Pressable>
           </View>
         ) : null}
         <TextInput
@@ -52,7 +57,10 @@ export default function CreatePodcastScreen() {
         <Pressable
           style={styles.button}
           onPress={() => {
-            if (!allowed) return;
+            if (!allowed) {
+              setShowBecomeArtist(true);
+              return;
+            }
             if (!title.trim()) return;
             void (async () => {
               const profile = await getMyProfile();
@@ -65,6 +73,13 @@ export default function CreatePodcastScreen() {
         >
           <AppText>Create Show</AppText>
         </Pressable>
+
+        <BecomeArtistModal
+          visible={showBecomeArtist}
+          title="Become an Artist to create podcasts"
+          description="Artists can upload music, create podcast shows, host live rooms, and grow their audience."
+          onClose={() => setShowBecomeArtist(false)}
+        />
       </View>
     </Screen>
   );

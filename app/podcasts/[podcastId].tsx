@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SectionCard } from "@/components/cards/SectionCard";
 import { AppText } from "@/components/ui/AppText";
+import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
+import { isArtistAccount } from "@/features/auth/permissions";
 import {
   followPodcast,
   getPodcastById,
@@ -19,15 +21,20 @@ import { colors } from "@/theme/colors";
 export default function PodcastDetailsScreen() {
   const { podcastId } = useLocalSearchParams<{ podcastId: string }>();
   const [profileId, setProfileId] = useState("");
+  const [accountType, setAccountType] = useState<string>("listener");
   const [show, setShow] = useState<PodcastShow | null>(null);
   const [episodes, setEpisodes] = useState<PodcastEpisode[]>([]);
+  const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const pushToast = useUiStore((s) => s.pushToast);
 
   useEffect(() => {
     if (!podcastId) return;
     void (async () => {
       const profile = await getMyProfile();
-      if (profile?.id) setProfileId(profile.id);
+      if (profile?.id) {
+        setProfileId(profile.id);
+        setAccountType(profile.account_type ?? "listener");
+      }
       const [loadedShow, loadedEpisodes] = await Promise.all([getPodcastById(podcastId), getPodcastEpisodes(podcastId)]);
       setShow(loadedShow);
       setEpisodes(loadedEpisodes);
@@ -58,17 +65,32 @@ export default function PodcastDetailsScreen() {
           >
             <AppText>Follow Podcast</AppText>
           </Pressable>
-          <Link href="/podcasts/create" asChild>
-            <Pressable style={styles.btn}>
-              <AppText>Create Show</AppText>
+          {isArtistAccount(accountType) ? (
+            <>
+              <Link href="/podcasts/create" asChild>
+                <Pressable style={styles.btn}>
+                  <AppText>Create Show</AppText>
+                </Pressable>
+              </Link>
+              <Link href={`/podcasts/upload-episode?podcastId=${show.id}`} asChild>
+                <Pressable style={styles.btn}>
+                  <AppText>Upload Episode</AppText>
+                </Pressable>
+              </Link>
+            </>
+          ) : (
+            <Pressable style={styles.btn} onPress={() => setShowBecomeArtist(true)}>
+              <AppText>Create Podcast</AppText>
             </Pressable>
-          </Link>
-          <Link href={`/podcasts/upload-episode?podcastId=${show.id}`} asChild>
-            <Pressable style={styles.btn}>
-              <AppText>Upload Episode</AppText>
-            </Pressable>
-          </Link>
+          )}
         </View>
+
+        <BecomeArtistModal
+          visible={showBecomeArtist}
+          title="Become an Artist to create podcasts"
+          description="Artists can upload music, create podcast shows, host live rooms, and grow their audience."
+          onClose={() => setShowBecomeArtist(false)}
+        />
 
         <SectionCard title="Episodes">
           {episodes.length === 0 ? <AppText muted>No episodes published yet.</AppText> : null}

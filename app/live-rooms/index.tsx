@@ -2,9 +2,11 @@ import { Link, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
+import { isArtistAccount } from "@/features/auth/permissions";
 import { getLiveRooms, joinLiveRoom, type LiveRoom } from "@/features/liveRooms/liveRoomService";
 import { useUiStore } from "@/store/uiStore";
 import { colors } from "@/theme/colors";
@@ -12,12 +14,17 @@ import { colors } from "@/theme/colors";
 export default function LiveRoomsScreen() {
   const [profileId, setProfileId] = useState("");
   const [rooms, setRooms] = useState<LiveRoom[]>([]);
+  const [accountType, setAccountType] = useState<string>("listener");
+  const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const pushToast = useUiStore((s) => s.pushToast);
 
   useEffect(() => {
     void (async () => {
       const profile = await getMyProfile();
-      if (profile?.id) setProfileId(profile.id);
+      if (profile?.id) {
+        setProfileId(profile.id);
+        setAccountType(profile.account_type ?? "listener");
+      }
       const rows = await getLiveRooms();
       setRooms(rows);
     })();
@@ -29,11 +36,24 @@ export default function LiveRoomsScreen() {
         <AppText style={styles.title}>Live Audio Rooms</AppText>
         <AppText muted>Join live discussions, Q&A sessions, launches, and freestyle rooms.</AppText>
 
-        <Link href="/live-rooms/create" asChild>
-          <Pressable style={styles.primaryBtn}>
-            <AppText>Create Room</AppText>
+        {isArtistAccount(accountType) ? (
+          <Link href="/live-rooms/create" asChild>
+            <Pressable style={styles.primaryBtn}>
+              <AppText>Go Live</AppText>
+            </Pressable>
+          </Link>
+        ) : (
+          <Pressable style={styles.primaryBtn} onPress={() => setShowBecomeArtist(true)}>
+            <AppText>Go Live</AppText>
           </Pressable>
-        </Link>
+        )}
+
+        <BecomeArtistModal
+          visible={showBecomeArtist}
+          title="Become an Artist to host live rooms"
+          description="Artists can host fan Q&As, album launches, live podcast sessions, and music conversations."
+          onClose={() => setShowBecomeArtist(false)}
+        />
 
         {rooms.length === 0 ? <EmptyState title="No live rooms" subtitle="Create a room and start a conversation." /> : null}
         {rooms.map((room) => (

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
 import { canManagePodcast, uploadPodcastEpisode } from "@/features/podcasts/podcastService";
@@ -13,6 +14,7 @@ export default function UploadPodcastEpisodeScreen() {
   const { podcastId } = useLocalSearchParams<{ podcastId: string }>();
   const [allowed, setAllowed] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [audioPath, setAudioPath] = useState("");
@@ -43,6 +45,9 @@ export default function UploadPodcastEpisodeScreen() {
         {checked && !allowed ? (
           <View style={styles.block}>
             <AppText muted>Only the owning Artist can upload episodes to this podcast.</AppText>
+            <Pressable style={[styles.button, { marginTop: 10 }]} onPress={() => setShowBecomeArtist(true)}>
+              <AppText>Become Artist</AppText>
+            </Pressable>
           </View>
         ) : null}
         <TextInput style={styles.input} placeholder="Episode title" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
@@ -78,7 +83,10 @@ export default function UploadPodcastEpisodeScreen() {
         <Pressable
           style={styles.button}
           onPress={() => {
-            if (!allowed) return;
+            if (!allowed) {
+              setShowBecomeArtist(true);
+              return;
+            }
             if (!podcastId || !title.trim() || !audioPath.trim()) return;
             void uploadPodcastEpisode(podcastId, {
               title: title.trim(),
@@ -94,6 +102,13 @@ export default function UploadPodcastEpisodeScreen() {
         >
           <AppText>Publish Episode</AppText>
         </Pressable>
+
+        <BecomeArtistModal
+          visible={showBecomeArtist}
+          title="Become an Artist to create podcasts"
+          description="Artists can upload music, create podcast shows, host live rooms, and grow their audience."
+          onClose={() => setShowBecomeArtist(false)}
+        />
       </View>
     </Screen>
   );

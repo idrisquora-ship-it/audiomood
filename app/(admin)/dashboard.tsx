@@ -24,6 +24,7 @@ export default function AdminDashboardScreen() {
   const [adminProfileId, setAdminProfileId] = useState("");
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [audience, setAudience] = useState<"all" | "listeners" | "artists">("all");
 
   useEffect(() => {
     void (async () => {
@@ -137,15 +138,34 @@ export default function AdminDashboardScreen() {
             onChangeText={setAnnouncementMessage}
           />
           <Pressable
+            onPress={() => {
+              const order: Array<"all" | "listeners" | "artists"> = ["all", "listeners", "artists"];
+              const idx = order.indexOf(audience);
+              setAudience(order[(idx + 1) % order.length]);
+            }}
+          >
+            <AppText muted>Audience: {audience}</AppText>
+          </Pressable>
+          <Pressable
             onPress={() =>
               void withAdmin(async (adminId) => {
                 if (!adminProfileId || !announcementTitle || !announcementMessage) return;
-                await createAdminAnnouncementWithPush(
-                  adminId,
-                  adminProfileId,
-                  announcementTitle,
-                  announcementMessage
-                );
+                const usersQuery = supabase.from("profiles").select("id,user_id,account_type");
+                const usersRes =
+                  audience === "listeners"
+                    ? await usersQuery.eq("account_type", "listener")
+                    : audience === "artists"
+                      ? await usersQuery.in("account_type", ["artist", "both"])
+                      : await usersQuery;
+                const recipients = usersRes.data ?? [];
+                for (const recipient of recipients) {
+                  await createAdminAnnouncementWithPush(
+                    adminId,
+                    recipient.id,
+                    announcementTitle,
+                    announcementMessage
+                  );
+                }
                 setAnnouncementTitle("");
                 setAnnouncementMessage("");
               })

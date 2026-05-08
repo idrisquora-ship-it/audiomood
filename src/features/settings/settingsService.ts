@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import * as FileSystem from "expo-file-system";
 
 export type AppSettings = {
   autoplay_recommendations: boolean;
@@ -314,6 +315,76 @@ export async function clearListeningHistory(profileId: string) {
 export async function clearSearchHistory(profileId: string) {
   const { error } = await supabase.from("search_history").delete().eq("user_id", profileId);
   if (error) throw error;
+}
+
+export async function clearPodcastHistory(profileId: string) {
+  const { error } = await supabase.from("podcast_history").delete().eq("user_id", profileId);
+  if (error) throw error;
+}
+
+export async function getConnectedAuthProviders() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  const identities = data.user?.identities ?? [];
+  const providers = identities.map((i) => i.provider).filter(Boolean) as string[];
+  if (providers.length === 0) return ["email"];
+  return [...new Set(providers)];
+}
+
+export async function deleteAllDownloads(profileId: string) {
+  const rows = await getDownloadedSongs(profileId);
+  for (const row of rows) {
+    const localPath = row.local_path as string | null;
+    if (!localPath) continue;
+    try {
+      const info = await FileSystem.getInfoAsync(localPath);
+      if (info.exists) await FileSystem.deleteAsync(localPath, { idempotent: true });
+    } catch {
+      // Ignore file cleanup errors; DB cleanup still continues.
+    }
+  }
+  const { error } = await supabase.from("downloaded_songs").delete().eq("user_id", profileId);
+  if (error) throw error;
+}
+
+export async function clearMediaCache() {
+  if (!FileSystem.cacheDirectory) return;
+  const keyDirs = ["ExponentAsset-", "ReactNative-snapshot-image", "ImagePicker"];
+  const listing = await FileSystem.readDirectoryAsync(FileSystem.cacheDirectory);
+  for (const entry of listing) {
+    if (!keyDirs.some((k) => entry.includes(k))) continue;
+    const target = `${FileSystem.cacheDirectory}${entry}`;
+    try {
+      await FileSystem.deleteAsync(target, { idempotent: true });
+    } catch {
+      // Best effort cache clear.
+    }
+  }
+}
+
+export async function getHiddenArtistCount(profileId: string) {
+  const { data, error } = await supabase
+    .from("radio_feedback")
+    .select("id", { count: "exact" })
+    .eq("user_id", profileId)
+    .eq("feedback", "hide_artist");
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
+export async function clearHiddenArtists(profileId: string) {
+  const { error } = await supabase
+    .from("radio_feedback")
+    .delete()
+    .eq("user_id", profileId)
+    .eq("feedback", "hide_artist");
+  if (error) throw error;
+}
+
+export async function getArtistVerificationStatus(profileId: string) {
+  const { data } = await supabase.from("artist_profiles").select("status,verified").eq("id", profileId).maybeSingle();
+  if (!data) return null;
+  return data as { status: string; verified: boolean };
 }
 
 export async function getSubscriptionSummary(profileId: string) {

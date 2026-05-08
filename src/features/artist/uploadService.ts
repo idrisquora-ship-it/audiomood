@@ -143,3 +143,18 @@ export async function uploadAlbumCover(artistId: string, localCoverUri: string) 
   await uploadArrayBuffer("album-covers", fileName, localCoverUri, "image/jpeg");
   return fileName;
 }
+
+export async function getLatestArtistSongCoverUri(artistId: string) {
+  const { data, error } = await supabase
+    .from("songs")
+    .select("cover_path")
+    .eq("artist_id", artistId)
+    .not("cover_path", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const coverPath = data?.cover_path as string | null | undefined;
+  if (!coverPath) return null;
+  return supabase.storage.from("song-covers").getPublicUrl(coverPath).data.publicUrl;
+}

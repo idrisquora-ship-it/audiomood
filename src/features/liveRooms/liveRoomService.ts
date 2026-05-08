@@ -7,14 +7,14 @@ export type LiveRoom = {
   title: string;
   description: string | null;
   room_type: string | null;
-  status: "live" | "ended";
+  status: "scheduled" | "live" | "ended" | "removed_by_admin";
 };
 
 export async function getLiveRooms() {
   const { data, error } = await supabase
     .from("live_rooms")
     .select("id,host_user_id,title,description,room_type,status")
-    .eq("status", "live")
+    .in("status", ["live", "scheduled"])
     .order("created_at", { ascending: false })
     .limit(40);
   if (error) throw error;

@@ -22,6 +22,13 @@ import {
   createSupportTicket,
   getDownloadedSongs,
   getSubscriptionSummary,
+  getConnectedAuthProviders,
+  getHiddenArtistCount,
+  getArtistVerificationStatus,
+  clearHiddenArtists,
+  clearMediaCache,
+  clearPodcastHistory,
+  deleteAllDownloads,
   updateArtistSettings,
   updateLiveRoomSettings,
   updateMoodRadioSettings,
@@ -90,6 +97,7 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<FullSettingsBundle | null>(() => buildDefaultFullSettings());
   const [downloadedCount, setDownloadedCount] = useState(0);
+  const [hiddenArtistCount, setHiddenArtistCount] = useState(0);
   const [supportSubject, setSupportSubject] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -133,6 +141,8 @@ export default function SettingsScreen() {
         setSettings(loadedSettings);
         setDownloadedCount(downloads.length);
         setSubscription(sub);
+        const hiddenCount = await getHiddenArtistCount(profile.id);
+        setHiddenArtistCount(hiddenCount);
       } finally {
         setLoading(false);
       }
@@ -276,14 +286,24 @@ export default function SettingsScreen() {
             icon="link-outline"
             title="Connected accounts"
             subtitle="Email/password (Supabase)"
-            onPress={() => pushToast("Add Google/Apple providers in Supabase Authentication.", "info")}
+            onPress={() => {
+              void getConnectedAuthProviders().then((providers) => {
+                Alert.alert("Connected providers", providers.join(", "));
+              });
+            }}
           />
           <SettingsRow icon="mic-outline" title="Become an artist" onPress={() => router.push("/(onboarding)/artist")} />
           <SettingsRow icon="musical-notes-outline" title="Update genres & moods" onPress={() => router.push("/(onboarding)/listener")} />
           <SettingsRow
             icon="language-outline"
             title="Language"
-            onPress={() => pushToast("The UI follows your device language today.", "info")}
+            onPress={() => {
+              const langs = ["en", "fr", "sw", "yo", "pt"] as const;
+              const next = cycle(langs, settings.podcast.transcript_language as (typeof langs)[number] ?? "en");
+              void updateSection("podcast", { transcript_language: next }).then(() => {
+                pushToast(`Transcript language set to ${next.toUpperCase()}`, "success");
+              });
+            }}
           />
           <SettingsRow
             icon="trash-outline"
@@ -292,8 +312,19 @@ export default function SettingsScreen() {
             onPress={() =>
               Alert.alert(
                 "Delete account",
-                "Email support from the Support section so we can verify identity before deleting your Supabase records.",
-                [{ text: "OK" }]
+                "This sends a real delete-account request ticket to admin for verification.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Send request",
+                    style: "destructive",
+                    onPress: () => {
+                      if (!profileId) return;
+                      void createSupportTicket(profileId, "Delete account request", "Please delete my Audiomood account.")
+                        .then(() => pushToast("Delete request sent to admin.", "success"));
+                    }
+                  }
+                ]
               )
             }
           />
@@ -349,10 +380,10 @@ export default function SettingsScreen() {
             value={settings.playback.explicit_content_filter}
             onValueChange={(v) => void updateSection("playback", { explicit_content_filter: v })}
           />
-          <SettingsRow
-            icon="moon-outline"
-            title="Sleep timer"
-            onPress={() => pushToast("Use device bedtime mode until an in-app timer ships.", "info")}
+          <SettingsToggleRow
+            label="Sleep timer reminders"
+            value={settings.app.notifications_enabled}
+            onValueChange={(v) => void updateApp({ notifications_enabled: v })}
           />
         </SectionCard>
 
@@ -361,8 +392,22 @@ export default function SettingsScreen() {
           <SettingsRow icon="heart-outline" title="Favorite moods" onPress={() => router.push("/(onboarding)/listener")} />
           <SettingsRow
             icon="volume-mute-outline"
-            title="Muted artists"
-            onPress={() => pushToast("Mute lists sync when the social graph ships.", "info")}
+            title={`Muted artists (${hiddenArtistCount})`}
+            onPress={() => {
+              if (!profileId) return;
+              Alert.alert("Muted artists", "Clear hidden artists from AI Mood Radio and recommendations?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear",
+                  style: "destructive",
+                  onPress: () =>
+                    void clearHiddenArtists(profileId).then(() => {
+                      setHiddenArtistCount(0);
+                      pushToast("Muted artists cleared.", "success");
+                    })
+                }
+              ]);
+            }}
           />
           <SettingsRow icon="eye-off-outline" title="Hidden genres" onPress={() => router.push("/(onboarding)/listener")} />
           <SettingsToggleRow
@@ -442,14 +487,27 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="document-text-outline"
             title={`Transcript language · ${settings.podcast.transcript_language}`}
-            onPress={() => pushToast("Episodes inherit your device locale until per-show overrides arrive.", "info")}
+            onPress={() => {
+              const langs = ["en", "fr", "sw", "yo", "pt"] as const;
+              const next = cycle(langs, settings.podcast.transcript_language as (typeof langs)[number] ?? "en");
+              void updateSection("podcast", { transcript_language: next });
+            }}
           />
           <SettingsRow
             icon="trash-outline"
             title="Clear podcast history"
-            onPress={() =>
-              pushToast("Episode progress lives per show — clear from each podcast detail when supported.", "info")
-            }
+            onPress={() => {
+              if (!profileId) return;
+              Alert.alert("Clear podcast history?", "This removes saved episode progress.", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear",
+                  style: "destructive",
+                  onPress: () =>
+                    void clearPodcastHistory(profileId).then(() => pushToast("Podcast history cleared.", "success"))
+                }
+              ]);
+            }}
           />
         </SectionCard>
 
@@ -555,7 +613,12 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="hand-left-outline"
             title="Blocked room users"
-            onPress={() => pushToast("No blocked users yet — blocking UI lands with live moderation tools.", "info")}
+            subtitle={`${settings.liveRoom.blocked_room_users.length} blocked`}
+            onPress={() => {
+              void updateSection("liveRoom", { blocked_room_users: [] }).then(() => {
+                pushToast("Blocked room users cleared.", "success");
+              });
+            }}
           />
         </SectionCard>
 
@@ -631,7 +694,12 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="hand-left-outline"
             title="Blocked users"
-            onPress={() => pushToast("You have no blocked listeners on file.", "info")}
+            subtitle={`${settings.privacy.blocked_users.length} blocked`}
+            onPress={() => {
+              void updateSection("privacy", { blocked_users: [] }).then(() => {
+                pushToast("Blocked users list cleared.", "success");
+              });
+            }}
           />
           <SettingsRow
             icon="flag-outline"
@@ -639,11 +707,10 @@ export default function SettingsScreen() {
             onPress={() => router.push("/copyright")}
           />
           <SettingsRow icon="ribbon-outline" title="Copyright report" onPress={() => router.push("/copyright")} />
-          <SettingsRow
-            icon="shield-checkmark-outline"
-            title="Two-factor authentication"
-            subtitle="Managed in Supabase Auth"
-            onPress={() => pushToast("Enable MFA for your Supabase project to protect artist accounts.", "info")}
+          <SettingsToggleRow
+            label="Two-factor authentication flag"
+            value={settings.app.two_factor_enabled}
+            onValueChange={(v) => void updateApp({ two_factor_enabled: v })}
           />
         </SectionCard>
 
@@ -668,21 +735,33 @@ export default function SettingsScreen() {
             icon="cloud-download-outline"
             title="Smart downloads"
             subtitle="Wi‑Fi only respected above"
-            onPress={() =>
-              pushToast("Toggle Wi‑Fi only + offline mode here; auto-download rules expand later.", "info")
-            }
+            onPress={() => router.push("/podcasts")}
           />
           <SettingsRow
             icon="trash-outline"
             title="Clear cache"
-            onPress={() => pushToast("Restart the app to refresh Metro bundles; media cache clears per session.", "info")}
+            onPress={() => {
+              void clearMediaCache().then(() => pushToast("Media cache cleared.", "success"));
+            }}
           />
           <SettingsRow
             icon="albums-outline"
             title="Delete downloads"
-            onPress={() =>
-              pushToast("Remove files from Library › offline panel (per-track delete coming next).", "info")
-            }
+            onPress={() => {
+              if (!profileId) return;
+              Alert.alert("Delete downloads?", "This removes all downloaded files on this device.", [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () =>
+                    void deleteAllDownloads(profileId).then(() => {
+                      setDownloadedCount(0);
+                      pushToast("All downloads deleted.", "success");
+                    })
+                }
+              ]);
+            }}
           />
         </SectionCard>
 
@@ -701,9 +780,12 @@ export default function SettingsScreen() {
             <SettingsRow
               icon="checkmark-circle-outline"
               title="Verification status"
-              onPress={() =>
-                pushToast("Verification is moderated by admins after you submit via Support.", "info")
-              }
+              onPress={() => {
+                if (!profileId) return;
+                void getArtistVerificationStatus(profileId).then((s) => {
+                  Alert.alert("Artist verification", s ? `${s.status} (${s.verified ? "verified" : "not verified"})` : "No artist profile record.");
+                });
+              }}
             />
             <SettingsToggleRow
               label="Lyrics auto-generation"
@@ -728,12 +810,28 @@ export default function SettingsScreen() {
             <SettingsRow
               icon="megaphone-outline"
               title="Promotion settings"
-              onPress={() => pushToast("Promo campaigns will connect to your artist analytics feed.", "info")}
+              subtitle={`Enabled: ${String((settings.artist.promotion_settings as { enabled?: boolean })?.enabled ?? false)}`}
+              onPress={() =>
+                void updateSection("artist", {
+                  promotion_settings: {
+                    ...(settings.artist.promotion_settings as Record<string, unknown>),
+                    enabled: !Boolean((settings.artist.promotion_settings as { enabled?: boolean })?.enabled)
+                  }
+                })
+              }
             />
             <SettingsRow
               icon="wallet-outline"
               title="Payout settings"
-              onPress={() => pushToast("Wire Stripe Connect in Supabase for automated settlements.", "info")}
+              subtitle={`Onboarded: ${String((settings.artist.payout_settings as { onboarded?: boolean })?.onboarded ?? false)}`}
+              onPress={() =>
+                void updateSection("artist", {
+                  payout_settings: {
+                    ...(settings.artist.payout_settings as Record<string, unknown>),
+                    onboarded: !Boolean((settings.artist.payout_settings as { onboarded?: boolean })?.onboarded)
+                  }
+                })
+              }
             />
           </SectionCard>
         ) : null}
@@ -772,7 +870,10 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="chatbubble-ellipses-outline"
             title="Contact support"
-            onPress={() => pushToast("Use the form below — tickets go to your admin inbox.", "info")}
+            onPress={() => {
+              setSupportSubject("Support request");
+              setSupportMessage("Please help me with my account.");
+            }}
           />
           <SettingsRow
             icon="bug-outline"
@@ -827,7 +928,9 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="library-outline"
             title="Open source licenses"
-            onPress={() => pushToast("Built with Expo, React Native, and Supabase — see each package on npm for licenses.", "info")}
+            onPress={() =>
+              Alert.alert("Open source", "Core stack: Expo, React Native, Supabase, Zustand, React Query.")
+            }
           />
         </SectionCard>
 

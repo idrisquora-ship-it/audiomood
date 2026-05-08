@@ -2,6 +2,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { AppText } from "@/components/ui/AppText";
 import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { Screen } from "@/components/ui/Screen";
@@ -17,9 +19,12 @@ export default function UploadPodcastEpisodeScreen() {
   const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [audioPath, setAudioPath] = useState("");
-  const [coverPath, setCoverPath] = useState("");
+  const [audioUri, setAudioUri] = useState("");
+  const [audioName, setAudioName] = useState("");
+  const [audioMime, setAudioMime] = useState<string | null>(null);
+  const [coverUri, setCoverUri] = useState("");
   const [releaseDate, setReleaseDate] = useState("");
+  const [processTranscript, setProcessTranscript] = useState(true);
   const pushToast = useUiStore((s) => s.pushToast);
 
   useEffect(() => {
@@ -37,6 +42,28 @@ export default function UploadPodcastEpisodeScreen() {
       setChecked(true);
     })();
   }, [podcastId]);
+
+  const pickEpisodeAudio = async () => {
+    const res = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+      type: ["audio/mpeg", "audio/mp4", "audio/mp3", "audio/wav", "audio/x-wav"]
+    });
+    if (res.canceled) return;
+    const asset = res.assets?.[0];
+    if (!asset?.uri) return;
+    setAudioUri(asset.uri);
+    setAudioName(asset.name ?? "episode-audio");
+    setAudioMime(asset.mimeType ?? "audio/mpeg");
+  };
+
+  const pickCover = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const img = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
+    if (img.canceled || !img.assets[0]?.uri) return;
+    setCoverUri(img.assets[0].uri);
+  };
 
   return (
     <Screen>
@@ -59,20 +86,12 @@ export default function UploadPodcastEpisodeScreen() {
           onChangeText={setDescription}
           multiline
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Audio path (storage URL/path)"
-          placeholderTextColor={colors.textMuted}
-          value={audioPath}
-          onChangeText={setAudioPath}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Cover path (optional)"
-          placeholderTextColor={colors.textMuted}
-          value={coverPath}
-          onChangeText={setCoverPath}
-        />
+        <Pressable style={styles.input} onPress={() => void pickEpisodeAudio()}>
+          <AppText>{audioName || "Pick episode audio file"}</AppText>
+        </Pressable>
+        <Pressable style={styles.input} onPress={() => void pickCover()}>
+          <AppText>{coverUri ? "Episode cover selected" : "Pick episode cover (optional)"}</AppText>
+        </Pressable>
         <TextInput
           style={styles.input}
           placeholder="Schedule release date ISO (optional)"
@@ -81,19 +100,29 @@ export default function UploadPodcastEpisodeScreen() {
           onChangeText={setReleaseDate}
         />
         <Pressable
+          style={styles.input}
+          onPress={() => {
+            setProcessTranscript((v) => !v);
+          }}
+        >
+          <AppText>Transcript processing: {processTranscript ? "On" : "Off"}</AppText>
+        </Pressable>
+        <Pressable
           style={styles.button}
           onPress={() => {
             if (!allowed) {
               setShowBecomeArtist(true);
               return;
             }
-            if (!podcastId || !title.trim() || !audioPath.trim()) return;
+            if (!podcastId || !title.trim() || !audioUri.trim()) return;
             void uploadPodcastEpisode(podcastId, {
               title: title.trim(),
               description: description.trim(),
-              audioPath: audioPath.trim(),
-              coverPath: coverPath.trim() || undefined,
-              releaseDate: releaseDate.trim() || null
+              audioUri: audioUri.trim(),
+              audioMime,
+              coverUri: coverUri.trim() || undefined,
+              releaseDate: releaseDate.trim() || null,
+              processTranscript
             }).then((episodeId) => {
               pushToast("Podcast episode uploaded", "success");
               router.replace(`/podcasts/episode/${episodeId}`);

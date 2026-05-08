@@ -2,11 +2,13 @@ import { router } from "expo-router";
 import { useEffect } from "react";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { AppText } from "@/components/ui/AppText";
 import { BecomeArtistModal } from "@/components/ui/BecomeArtistModal";
 import { Screen } from "@/components/ui/Screen";
 import { getMyProfile } from "@/features/auth/authService";
 import { createPodcastShow } from "@/features/podcasts/podcastService";
+import { supabase } from "@/lib/supabase";
 import { useUiStore } from "@/store/uiStore";
 import { colors } from "@/theme/colors";
 
@@ -15,6 +17,9 @@ export default function CreatePodcastScreen() {
   const [checkedRole, setCheckedRole] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [coverUri, setCoverUri] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [showBecomeArtist, setShowBecomeArtist] = useState(false);
   const pushToast = useUiStore((s) => s.pushToast);
 
@@ -24,8 +29,18 @@ export default function CreatePodcastScreen() {
       const ok = profile?.account_type === "artist" || profile?.account_type === "both";
       setAllowed(Boolean(ok));
       setCheckedRole(true);
+      const c = await supabase.from("podcast_categories").select("id,name").order("name");
+      setCategories((c.data ?? []) as Array<{ id: string; name: string }>);
     })();
   }, []);
+
+  const pickShowCover = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const img = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9 });
+    if (img.canceled || !img.assets[0]?.uri) return;
+    setCoverUri(img.assets[0].uri);
+  };
 
   return (
     <Screen>
@@ -54,6 +69,22 @@ export default function CreatePodcastScreen() {
           onChangeText={setDescription}
           multiline
         />
+        <Pressable style={styles.input} onPress={() => void pickShowCover()}>
+          <AppText>{coverUri ? "Cover selected" : "Pick podcast cover image"}</AppText>
+        </Pressable>
+        <Pressable
+          style={styles.input}
+          onPress={() => {
+            if (!categories.length) return;
+            const idx = Math.max(0, categories.findIndex((c) => c.id === categoryId));
+            const next = categories[(idx + 1) % categories.length];
+            setCategoryId(next.id);
+          }}
+        >
+          <AppText>
+            Category: {categories.find((c) => c.id === categoryId)?.name ?? (categories[0]?.name ?? "Uncategorized")}
+          </AppText>
+        </Pressable>
         <Pressable
           style={styles.button}
           onPress={() => {
@@ -65,7 +96,13 @@ export default function CreatePodcastScreen() {
             void (async () => {
               const profile = await getMyProfile();
               if (!profile?.id) return;
-              const podcastId = await createPodcastShow(profile.id, { title: title.trim(), description: description.trim() });
+              const fallbackCategory = categoryId || categories[0]?.id || null;
+              const podcastId = await createPodcastShow(profile.id, {
+                title: title.trim(),
+                description: description.trim(),
+                categoryId: fallbackCategory,
+                coverUri: coverUri || undefined
+              });
               pushToast("Podcast created", "success");
               router.replace(`/podcasts/${podcastId}`);
             })();

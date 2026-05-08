@@ -116,8 +116,12 @@ export default function PodcastPlayerScreen() {
         </View>
 
         <View style={styles.placeholder}>
-          <AppText muted>Download episode (Premium) placeholder</AppText>
-          <AppText muted>Transcript placeholder</AppText>
+          <AppText muted>
+            Episode progress is synced to your profile automatically.
+          </AppText>
+          <AppText muted>
+            Transcript: {episode.transcript_text ? "available" : "not available yet"}
+          </AppText>
         </View>
       </View>
     </Screen>

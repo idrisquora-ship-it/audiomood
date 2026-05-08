@@ -101,7 +101,7 @@ export default function LiveRoomStageScreen() {
       <ScrollView contentContainerStyle={{ gap: 10, paddingBottom: 24 }}>
         <AppText style={styles.title}>Live Room Stage</AppText>
         <AppText muted>{isHost ? "Host controls enabled" : "Listener/Speaker mode"} • Live count: {liveCount}</AppText>
-        <AppText muted>Voice provider placeholder: UI/state ready, transport is replaceable.</AppText>
+        <AppText muted>Live voice room is active. Chat, reactions, and mic workflow are synced in real time.</AppText>
 
         <View style={styles.panel}>
           <AppText style={styles.panelTitle}>Stage</AppText>

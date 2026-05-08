@@ -13,7 +13,7 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { AppText } from "@/components/ui/AppText";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { createAlbum, submitSongForReview, uploadAlbumCover } from "@/features/artist/uploadService";
+import { createAlbum, getLatestArtistSongCoverUri, submitSongForReview, uploadAlbumCover } from "@/features/artist/uploadService";
 import { supabase } from "@/lib/supabase";
 import { colors } from "@/theme/colors";
 import { spacing } from "@/theme/spacing";
@@ -32,6 +32,7 @@ export default function ArtistUploadScreen() {
   const [audioMime, setAudioMime] = useState<string | null>(null);
 
   const [coverUriSingle, setCoverUriSingle] = useState<string | null>(null);
+  const [defaultCoverUriSingle, setDefaultCoverUriSingle] = useState<string | null>(null);
   const [coverUriAlbum, setCoverUriAlbum] = useState<string | null>(null);
 
   const [genreId, setGenreId] = useState("");
@@ -54,6 +55,14 @@ export default function ArtistUploadScreen() {
       ]);
       setGenres((g.data ?? []) as Array<{ id: string; name: string }>);
       setMoods((m.data ?? []) as Array<{ id: string; name: string }>);
+      const user = (await supabase.auth.getUser()).data.user;
+      if (user?.id) {
+        const artist = await supabase.from("artist_profiles").select("id").eq("user_id", user.id).maybeSingle();
+        if (artist.data?.id) {
+          const latestCover = await getLatestArtistSongCoverUri(artist.data.id);
+          setDefaultCoverUriSingle(latestCover);
+        }
+      }
     })();
   }, []);
 
@@ -113,7 +122,7 @@ export default function ArtistUploadScreen() {
         description,
         audioUri,
         audioMime,
-        coverUri: coverUriSingle ?? undefined,
+        coverUri: coverUriSingle ?? defaultCoverUriSingle ?? undefined,
         genreId: genreId || undefined,
         moodId: moodId || undefined,
         language,
@@ -223,12 +232,24 @@ export default function ArtistUploadScreen() {
             />
             <UploadPickerCard
               label="Cover art"
-              hint="Square artwork looks best · optional"
-              valueLabel={coverUriSingle ? "Art selected" : undefined}
-              picked={!!coverUriSingle}
+              hint={defaultCoverUriSingle && !coverUriSingle ? "Using your latest song cover · tap to change" : "Square artwork looks best · optional"}
+              valueLabel={coverUriSingle ? "Art selected" : defaultCoverUriSingle ? "Using previous cover" : undefined}
+              picked={!!coverUriSingle || !!defaultCoverUriSingle}
               icon="image-outline"
               onPress={() => void pickCover("single")}
             />
+            {defaultCoverUriSingle ? (
+              <Pressable
+                style={[styles.dropdown, { marginTop: -2 }]}
+                onPress={() => {
+                  setDefaultCoverUriSingle(null);
+                  setCoverUriSingle(null);
+                }}
+              >
+                <AppText variant="caption">Remove auto cover and publish without artwork</AppText>
+                <Ionicons name="close-circle-outline" color={colors.textMuted} size={18} />
+              </Pressable>
+            ) : null}
             <UploadInput placeholder="YYYY-MM-DD" label="Release date" value={releaseDate} onChangeText={setReleaseDate} />
 
             <Pressable onPress={() => setLanguageOpen(true)} style={styles.dropdown}>

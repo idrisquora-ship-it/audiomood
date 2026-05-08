@@ -1,4 +1,5 @@
 import { Link, useLocalSearchParams } from "expo-router";
+import { Share } from "react-native";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { SectionCard } from "@/components/cards/SectionCard";
@@ -82,13 +83,25 @@ export default function PodcastEpisodeScreen() {
           >
             <AppText>Like</AppText>
           </Pressable>
-          <Pressable style={styles.btn} onPress={() => pushToast("Share placeholder ready", "info")}>
+          <Pressable
+            style={styles.btn}
+            onPress={() =>
+              void Share.share({
+                message: `Listen to "${episode.title}" on Audiomood podcasts`
+              })
+            }
+          >
             <AppText>Share</AppText>
           </Pressable>
         </View>
 
         <SectionCard title="Transcript">
-          <AppText muted>{episode.transcript_text ?? "Transcript placeholder. Auto transcript will appear here."}</AppText>
+          <AppText muted>
+            {episode.transcript_text ??
+              (episode.status === "processing_transcript"
+                ? "Transcript is processing and will appear automatically."
+                : "No transcript available for this episode yet.")}
+          </AppText>
         </SectionCard>
 
         <SectionCard title="Comments">

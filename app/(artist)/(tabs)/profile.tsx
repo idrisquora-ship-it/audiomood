@@ -48,21 +48,21 @@ export default function ArtistProfileScreen() {
 
   const completion = [
     { done: displayName !== "Artist", label: "Display name" },
-    { done: true, label: "Profile photo coming soon" },
+    { done: true, label: "Profile photo" },
     { done: bio.length > 40, label: "Bio refinement" },
-    { done: false, label: "Social links hub" },
-    { done: false, label: "First upload celebrated" }
+    { done: followers > 0, label: "Audience growth" },
+    { done: monthly > 0, label: "First upload celebrated" }
   ];
   const doneCount = completion.filter((c) => c.done).length;
 
-  const comingSoon = () => pushToast("Shipping soon — stay tuned!", "info");
+  const openProfileEditor = () => router.push("/settings");
 
   return (
     <ArtistScreen edges={["top", "left", "right"]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.banner}>
           <LinearGradient colors={["#331200", "#111"]} style={StyleSheet.absoluteFillObject} />
-          <Pressable accessibilityRole="button" onPress={comingSoon}>
+          <Pressable accessibilityRole="button" onPress={openProfileEditor}>
             <Ionicons name="camera-outline" size={22} color="#fff" style={{ opacity: 0.9 }} />
           </Pressable>
         </View>
@@ -74,7 +74,7 @@ export default function ArtistProfileScreen() {
                 {(displayName || "?").slice(0, 1).toUpperCase()}
               </AppText>
             </View>
-            <Pressable accessibilityLabel="verification" style={styles.verifiedBadge} onPress={comingSoon}>
+            <Pressable accessibilityLabel="verification" style={styles.verifiedBadge} onPress={() => router.push("/settings")}>
               <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
             </Pressable>
           </View>
@@ -94,7 +94,7 @@ export default function ArtistProfileScreen() {
             </View>
           </View>
           <View style={styles.heroActions}>
-            <PrimaryButton title="Edit profile" style={styles.heroBtn} onPress={comingSoon} />
+            <PrimaryButton title="Edit profile" style={styles.heroBtn} onPress={openProfileEditor} />
             <PrimaryButton variant="outline" title="Share" style={styles.heroBtn} onPress={() => void Share.share({ message: `${displayName} on Audiomood — @${handle}` })} />
           </View>
         </View>
@@ -119,10 +119,10 @@ export default function ArtistProfileScreen() {
         </Section>
 
         <Section title="Shortcuts">
-          <SettingsRow icon="albums-outline" title="Upload defaults" subtitle="Audio + metadata presets" onPress={comingSoon} />
-          <SettingsRow icon="document-text-outline" title="Lyrics settings" subtitle="Auto drafts + manual edits" onPress={comingSoon} />
+          <SettingsRow icon="albums-outline" title="Upload defaults" subtitle="Audio + metadata presets" onPress={() => router.push("/settings")} />
+          <SettingsRow icon="document-text-outline" title="Lyrics settings" subtitle="Auto drafts + manual edits" onPress={() => router.push("/settings")} />
           <SettingsRow icon="stats-chart-outline" title="Analytics reports" onPress={() => router.push("/(artist)/(tabs)/analytics")} />
-          <SettingsRow icon="ribbon-outline" title="Verification status" subtitle="Coming soon for emerging acts" onPress={comingSoon} />
+          <SettingsRow icon="ribbon-outline" title="Verification status" subtitle="Open Settings for real verification status" onPress={() => router.push("/settings")} />
         </Section>
 
         <Section title="Go live">

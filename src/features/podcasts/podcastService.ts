@@ -8,6 +8,7 @@ export type PodcastShow = {
   description: string | null;
   cover_path: string | null;
   creator_profile_id: string;
+  status?: string;
 };
 
 export type PodcastEpisode = {
@@ -20,12 +21,32 @@ export type PodcastEpisode = {
   duration_seconds: number | null;
   release_date: string | null;
   transcript_text: string | null;
+  status?: string;
 };
+
+const LISTENER_VISIBLE_PODCAST_STATUSES = ["published", "processing_transcript"];
+
+async function uploadArrayBuffer(bucket: string, storagePath: string, uri: string, contentType: string) {
+  const res = await fetch(uri);
+  const buf = await res.arrayBuffer();
+  const { error } = await supabase.storage.from(bucket).upload(storagePath, buf, { contentType, upsert: true });
+  if (error) throw error;
+  return storagePath;
+}
+
+function audioExtFromMime(mime?: string | null): string {
+  if (!mime) return "mp3";
+  if (mime.includes("mpeg")) return "mp3";
+  if (mime.includes("wav")) return "wav";
+  if (mime.includes("aac") || mime.includes("mp4") || mime.includes("m4a")) return "m4a";
+  return "mp3";
+}
 
 export async function getPodcasts(limit = 30) {
   const { data, error } = await supabase
     .from("podcasts")
-    .select("id,title,description,cover_path,creator_profile_id")
+    .select("id,title,description,cover_path,creator_profile_id,status")
+    .in("status", LISTENER_VISIBLE_PODCAST_STATUSES)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -35,7 +56,7 @@ export async function getPodcasts(limit = 30) {
 export async function getPodcastById(podcastId: string) {
   const { data, error } = await supabase
     .from("podcasts")
-    .select("id,title,description,cover_path,creator_profile_id")
+    .select("id,title,description,cover_path,creator_profile_id,status")
     .eq("id", podcastId)
     .single();
   if (error) throw error;
@@ -55,8 +76,9 @@ export async function canManagePodcast(podcastId: string, profileId: string) {
 export async function getPodcastEpisodes(podcastId: string) {
   const { data, error } = await supabase
     .from("podcast_episodes")
-    .select("id,podcast_id,title,description,cover_path,audio_path,duration_seconds,release_date,transcript_text")
+    .select("id,podcast_id,title,description,cover_path,audio_path,duration_seconds,release_date,transcript_text,status")
     .eq("podcast_id", podcastId)
+    .in("status", LISTENER_VISIBLE_PODCAST_STATUSES)
     .order("release_date", { ascending: false, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as PodcastEpisode[];
@@ -65,7 +87,7 @@ export async function getPodcastEpisodes(podcastId: string) {
 export async function getEpisodeById(episodeId: string) {
   const { data, error } = await supabase
     .from("podcast_episodes")
-    .select("id,podcast_id,title,description,cover_path,audio_path,duration_seconds,release_date,transcript_text")
+    .select("id,podcast_id,title,description,cover_path,audio_path,duration_seconds,release_date,transcript_text,status")
     .eq("id", episodeId)
     .single();
   if (error) throw error;
@@ -165,21 +187,34 @@ export async function searchPodcasts(query: string) {
   if (!query.trim()) return [];
   const { data, error } = await supabase
     .from("podcasts")
-    .select("id,title,description,cover_path,creator_profile_id")
+    .select("id,title,description,cover_path,creator_profile_id,status")
+    .in("status", LISTENER_VISIBLE_PODCAST_STATUSES)
     .ilike("title", `%${query.trim()}%`)
     .limit(20);
   if (error) throw error;
   return (data ?? []) as PodcastShow[];
 }
 
-export async function createPodcastShow(profileId: string, input: { title: string; description: string; categoryId?: string | null }) {
+export async function createPodcastShow(
+  profileId: string,
+  input: { title: string; description: string; categoryId?: string | null; coverUri?: string | null }
+) {
+  let coverPath: string | null = null;
+  if (input.coverUri) {
+    const cp = `${profileId}/${Date.now()}-show-cover.jpg`;
+    await uploadArrayBuffer("podcast-covers", cp, input.coverUri, "image/jpeg");
+    coverPath = cp;
+  }
+
   const { data, error } = await supabase
     .from("podcasts")
     .insert({
       creator_profile_id: profileId,
       title: input.title,
       description: input.description,
-      category_id: input.categoryId ?? null
+      category_id: input.categoryId ?? null,
+      cover_path: coverPath,
+      status: "published"
     })
     .select("id")
     .single();
@@ -189,17 +224,45 @@ export async function createPodcastShow(profileId: string, input: { title: strin
 
 export async function uploadPodcastEpisode(
   podcastId: string,
-  input: { title: string; description: string; audioPath: string; coverPath?: string; releaseDate?: string | null }
+  input: {
+    title: string;
+    description: string;
+    audioPath?: string;
+    audioUri?: string;
+    audioMime?: string | null;
+    coverPath?: string;
+    coverUri?: string | null;
+    releaseDate?: string | null;
+    processTranscript?: boolean;
+  }
 ) {
+  let audioPath = input.audioPath ?? "";
+  if (!audioPath && input.audioUri) {
+    const ext = audioExtFromMime(input.audioMime);
+    const audioMime = input.audioMime ?? (ext === "wav" ? "audio/wav" : ext === "m4a" ? "audio/mp4" : "audio/mpeg");
+    audioPath = `${podcastId}/${Date.now()}.${ext}`;
+    await uploadArrayBuffer("podcast-audio", audioPath, input.audioUri, audioMime);
+  }
+  if (!audioPath) throw new Error("Audio file is required.");
+
+  let coverPath = input.coverPath ?? null;
+  if (!coverPath && input.coverUri) {
+    const cp = `${podcastId}/${Date.now()}-episode-cover.jpg`;
+    await uploadArrayBuffer("podcast-covers", cp, input.coverUri, "image/jpeg");
+    coverPath = cp;
+  }
+  const status = input.processTranscript ? "processing_transcript" : "published";
+
   const { data, error } = await supabase
     .from("podcast_episodes")
     .insert({
       podcast_id: podcastId,
       title: input.title,
       description: input.description,
-      audio_path: input.audioPath,
-      cover_path: input.coverPath ?? null,
-      release_date: input.releaseDate ?? null
+      audio_path: audioPath,
+      cover_path: coverPath,
+      release_date: input.releaseDate ?? null,
+      status
     })
     .select("id")
     .single();
